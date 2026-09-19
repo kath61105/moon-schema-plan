@@ -27,6 +27,18 @@ All notable changes to this project are recorded here. The format follows
 
 ### Fixed
 
+- Adding a primary-key column to a table that already had one rendered
+  `ALTER TABLE ... ADD COLUMN ... PRIMARY KEY`, which PostgreSQL refuses as
+  more than one primary key per table, and the plan called it `review`.
+  Reshaping an existing key needs the constraint's name, which the schema does
+  not carry, so the transition is now refused while planning. Adding a key to a
+  table that has none still works, and SQLite reaches the same change through a
+  rebuild.
+- A foreign key could reference a column with no uniqueness guarantee.
+  PostgreSQL refuses such a constraint and SQLite reports a foreign key
+  mismatch when rows are written; validation now requires the referenced
+  columns to be, as a set, the referenced table's primary key, a single unique
+  column, or the columns of one of its unique indexes.
 - A composite primary key rendered one inline `PRIMARY KEY` per key column,
   which both SQLite and PostgreSQL reject as more than one primary key per
   table. It now renders a single table-level `PRIMARY KEY (a, b)` constraint.

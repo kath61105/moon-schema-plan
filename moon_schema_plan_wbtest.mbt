@@ -274,7 +274,9 @@ test "plans are deterministic across schema declaration order" {
 
 ///|
 test "dropped tables use reverse foreign-key dependency order" {
-  let parents = test_table("parents", [test_column("id", nullable=false)])
+  let parents = test_table("parents", [
+    test_column("id", nullable=false, primary_key=true),
+  ])
   let children = test_table("children", [test_column("parent_id")], foreign_keys=[
     {
       name: "children_parent_fk",

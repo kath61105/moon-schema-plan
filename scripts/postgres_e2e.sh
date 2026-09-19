@@ -245,6 +245,48 @@ if grep -q 'ALTER TABLE' "$work_dir/blocked.sql"; then
   failures=$((failures + 1))
 fi
 
+# Case 6: two transitions PostgreSQL refuses, which must be caught while
+# planning rather than discovered by the server. Each used to render SQL that
+# the statements below would have rejected.
+second_key='{"version":"2","tables":[{"name":"t","columns":[
+  {"name":"a","data_type":"INTEGER","nullable":false,"primary_key":true,"unique":false},
+  {"name":"b","data_type":"INTEGER","nullable":false,"primary_key":true,"unique":false}
+],"indexes":[],"foreign_keys":[],"checks":[]}]}'
+one_key='{"version":"1","tables":[{"name":"t","columns":[
+  {"name":"a","data_type":"INTEGER","nullable":false,"primary_key":true,"unique":false}
+],"indexes":[],"foreign_keys":[],"checks":[]}]}'
+
+set +e
+moon run cmd/main -- plan postgresql --before-json "$one_key"   --after-json "$second_key" --allow-destructive > "$work_dir/second_key.sql" 2>&1
+second_key_status=$?
+set -e
+check 'adding a second primary key is refused while planning' '1' "$second_key_status"
+if grep -q 'ADD COLUMN' "$work_dir/second_key.sql"; then
+  printf 'FAIL a refused key change still emitted SQL\n' >&2
+  failures=$((failures + 1))
+fi
+
+loose_fk='{"version":"2","tables":[
+{"name":"p","columns":[
+  {"name":"id","data_type":"INTEGER","nullable":false,"primary_key":true,"unique":false},
+  {"name":"code","data_type":"INTEGER","nullable":true,"primary_key":false,"unique":false}],
+ "indexes":[],"foreign_keys":[],"checks":[]},
+{"name":"c","columns":[
+  {"name":"id","data_type":"INTEGER","nullable":false,"primary_key":true,"unique":false},
+  {"name":"ref","data_type":"INTEGER","nullable":true,"primary_key":false,"unique":false}],
+ "indexes":[],"checks":[],
+ "foreign_keys":[{"name":"c_p_fk","columns":["ref"],"referenced_table":"p","referenced_columns":["code"]}]}]}'
+
+set +e
+moon run cmd/main -- plan postgresql --before-json '{"version":"1","tables":[]}'   --after-json "$loose_fk" > "$work_dir/loose_fk.sql" 2>&1
+loose_fk_status=$?
+set -e
+check 'a foreign key to a non-unique column is refused while planning' '1' "$loose_fk_status"
+if grep -q 'CREATE TABLE' "$work_dir/loose_fk.sql"; then
+  printf 'FAIL a refused foreign key still emitted SQL\n' >&2
+  failures=$((failures + 1))
+fi
+
 psql_run -c "DROP SCHEMA IF EXISTS msp_example, msp_composite, msp_cycle, msp_check CASCADE;" \
   >/dev/null 2>&1 || true
 

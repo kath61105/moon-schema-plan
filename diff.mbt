@@ -390,6 +390,40 @@ fn validate_dialect_transition(
       }
     }
   }
+  if dialect == PostgreSQL {
+    // `ALTER TABLE ... ADD COLUMN x ... PRIMARY KEY` only works while the table
+    // has no primary key; otherwise PostgreSQL refuses the statement outright.
+    // Reshaping an existing key needs the constraint's name, which this IR does
+    // not carry, so the transition is rejected here rather than rendered into
+    // SQL that fails. SQLite reaches this through a table rebuild instead.
+    for target_table in after.tables {
+      let source_name = renamed_table_source(hints, target_table.name).unwrap_or(
+        target_table.name,
+      )
+      match find_table(before.tables, source_name) {
+        None => ()
+        Some(source_table) => {
+          let had_key = source_table.columns.any(column => column.primary_key)
+          if had_key {
+            for column in target_table.columns {
+              let source_column = renamed_column_source(
+                hints,
+                target_table.name,
+                column.name,
+              ).unwrap_or(column.name)
+              if column.primary_key &&
+                find_column(source_table.columns, source_column) is None {
+                issues.push({
+                  path: "tables.\{target_table.name}.columns.\{column.name}",
+                  message: "PostgreSQL cannot add a primary-key column to a table that already has a primary key; the constraint name is needed and the schema does not carry it",
+                })
+              }
+            }
+          }
+        }
+      }
+    }
+  }
   issues
 }
 

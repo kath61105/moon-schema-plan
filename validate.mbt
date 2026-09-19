@@ -36,6 +36,34 @@ fn sort_issues(issues : Array[ValidationIssue]) -> Array[ValidationIssue] {
 }
 
 ///|
+fn same_column_set(left : Array[String], right : Array[String]) -> Bool {
+  left.length() == right.length() &&
+  left.iter().all(name => has_name(right, name)) &&
+  right.iter().all(name => has_name(left, name))
+}
+
+///|
+/// Whether a table guarantees at most one row per value of `columns`. Both
+/// PostgreSQL and SQLite require a foreign key's referenced columns to be
+/// backed by such a guarantee; without one, PostgreSQL refuses the constraint
+/// and SQLite reports a foreign key mismatch when rows are written.
+fn uniquely_constrained(table : Table, columns : Array[String]) -> Bool {
+  let primary_key = table.columns
+    .filter(column => column.primary_key)
+    .map(column => column.name)
+  if !primary_key.is_empty() && same_column_set(primary_key, columns) {
+    return true
+  }
+  if columns.length() == 1 &&
+    table.columns.any(column => column.name == columns[0] && column.unique) {
+    return true
+  }
+  table.indexes.any(index => {
+    index.unique && same_column_set(index.columns, columns)
+  })
+}
+
+///|
 fn has_name(names : Array[String], wanted : String) -> Bool {
   names.any(name => name == wanted)
 }
@@ -252,6 +280,18 @@ pub fn validate_schema(schema : Schema) -> Array[ValidationIssue] {
                 message: "unknown referenced column: \{column}",
               })
             }
+          }
+          if foreign_key.referenced_columns
+            .iter()
+            .all(column => has_name(referenced_names, column)) &&
+            !uniquely_constrained(
+              referenced_table,
+              foreign_key.referenced_columns,
+            ) {
+            issues.push({
+              path: "\{base}.foreign_keys.\{foreign_key.name}",
+              message: "referenced columns must be a primary key or covered by a unique index in \{foreign_key.referenced_table}",
+            })
           }
         }
       }

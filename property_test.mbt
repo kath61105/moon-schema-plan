@@ -78,18 +78,25 @@ fn generated_schema(
     tables.push(generated_table(rng, i))
   }
   // Foreign keys are added once every table exists, and only ever point at an
-  // earlier table's primary key, so references are always resolvable.
+  // earlier table whose primary key is the single column c0. A composite key
+  // would not be matched by a one-column reference, and validation rightly
+  // rejects that, so those targets are skipped rather than generated invalid.
   for i = 1; i < table_count; i = i + 1 {
     if chance(rng, 3) {
       let target = below(rng, i)
-      tables[i].foreign_keys.push({
-        name: "t\{i}_fk\{target}",
-        columns: ["c0"],
-        referenced_table: "t\{target}",
-        referenced_columns: ["c0"],
-        on_delete: None,
-        on_update: None,
+      let key_columns = tables[target].columns.filter(column => {
+        column.primary_key
       })
+      if key_columns.length() == 1 && key_columns[0].name == "c0" {
+        tables[i].foreign_keys.push({
+          name: "t\{i}_fk\{target}",
+          columns: ["c0"],
+          referenced_table: "t\{target}",
+          referenced_columns: ["c0"],
+          on_delete: None,
+          on_update: None,
+        })
+      }
     }
   }
   { version, tables, }

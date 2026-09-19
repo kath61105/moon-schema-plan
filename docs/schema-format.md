@@ -63,6 +63,7 @@ which two snapshots it compares, and it is never parsed.
 | `indexes[].name` | Must be unique across the **whole schema**, not only within its table: index names are database-wide in SQLite and schema-wide in PostgreSQL. |
 | `indexes[].columns` | Must name columns of the same table, and must not be empty. |
 | `foreign_keys[].columns` / `referenced_columns` | Must be non-empty and the same length. Local columns must exist in this table; referenced ones in the referenced table. |
+| `foreign_keys[].referenced_columns` | Must also be, as a set, the referenced table's primary key, a single `unique` column, or the columns of one of its unique indexes. PostgreSQL refuses a constraint without such a guarantee, and SQLite reports a foreign key mismatch when rows are written. |
 | `on_delete` / `on_update` | Optional. One of `NO ACTION`, `RESTRICT`, `CASCADE`, `SET NULL`, `SET DEFAULT`. |
 
 Optional fields may be omitted entirely; an omitted `default_value` means the
