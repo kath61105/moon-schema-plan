@@ -99,6 +99,10 @@ moon run cmd/main -- plan postgresql \
 or `markdown` for review. `--out <path>` writes to a file. Schemas may also be
 passed inline with `--before-json` and `--after-json`.
 
+The JSON accepted and produced by every one of these is documented in
+[docs/schema-format.md](docs/schema-format.md), including why a rename needs an
+explicit hint and how to write a default expression.
+
 Run `moon run cmd/main -- demo` for a complete, executable SQLite example, and
 `moon run cmd/main -- help` for the full option list.
 
@@ -170,6 +174,7 @@ docker run --rm -v "$PWD:/workspace" moon-schema-plan-dev moon test --deny-warn
 
 ## Documentation
 
+- [Schema, hints and report JSON](docs/schema-format.md)
 - [Architecture and invariants](docs/architecture.md)
 - [One-page Chinese contest proposal](docs/proposal.zh-CN.md)
 - [Release and contest checklist](docs/release-checklist.md)
