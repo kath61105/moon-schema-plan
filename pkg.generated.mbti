@@ -38,6 +38,7 @@ pub(all) enum Change {
   DropForeignKey(String, ForeignKey)
   RebuildTable(Table, Table, Array[(String, String)])
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Change::describe(Self) -> String
 
 pub(all) struct Column {
   name : String
@@ -52,6 +53,8 @@ pub(all) enum Dialect {
   SQLite
   PostgreSQL
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Dialect::label(Self) -> String
+pub fn Dialect::parse(String) -> Self?
 
 pub(all) struct ForeignKey {
   name : String
@@ -82,6 +85,17 @@ pub(all) struct Plan {
   steps : Array[MigrationStep]
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 pub fn Plan::has_destructive_changes(Self) -> Bool
+pub fn Plan::max_risk(Self) -> Risk
+pub fn Plan::steps_above(Self, Risk) -> Array[MigrationStep]
+pub fn Plan::summary(Self) -> PlanSummary
+pub fn Plan::to_markdown(Self) -> String
+
+pub(all) struct PlanSummary {
+  total : Int
+  safe : Int
+  review : Int
+  destructive : Int
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 
 pub(all) struct RenameHints {
   tables : Array[(String, String)]
@@ -98,12 +112,16 @@ pub(all) struct RenderedPlan {
   plan : Plan
   sql : Array[String]
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn RenderedPlan::to_markdown(Self) -> String
 
 pub(all) enum Risk {
   Safe
   Review
   Destructive
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Risk::label(Self) -> String
+pub fn Risk::parse(String) -> Self?
+pub fn Risk::severity(Self) -> Int
 
 pub(all) struct Schema {
   version : String

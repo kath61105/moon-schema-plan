@@ -239,17 +239,8 @@ pub fn render_plan(
   guard issues.is_empty() else { return Err(issues) }
   let sql : Array[String] = []
   for step in plan.steps {
-    sql.push("-- \{step.id} [\{risk_label(step.risk)}] \{step.reason}")
+    sql.push("-- \{step.id} [\{step.risk.label()}] \{step.reason}")
     sql.push_iter(render_change(step.change, plan.dialect).iter())
   }
   Ok({ plan, sql, })
-}
-
-///|
-fn risk_label(risk : Risk) -> String {
-  match risk {
-    Safe => "safe"
-    Review => "review"
-    Destructive => "destructive"
-  }
 }
