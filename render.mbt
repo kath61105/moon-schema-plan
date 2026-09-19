@@ -93,11 +93,9 @@ fn postgres_alter_column(
       None => statements.push("\{prefix} DROP DEFAULT;")
     }
   }
-  if before.primary_key != after.primary_key || before.unique != after.unique {
-    statements.push(
-      "-- MANUAL REVIEW REQUIRED: key constraints changed for \{quote_identifier(table)}.\{quote_identifier(after.name)}; constraint names are not guessed.",
-    )
-  }
+  // A primary-key or uniqueness change needs a constraint name that the IR
+  // does not carry, so `render_plan` refuses the whole plan before reaching
+  // here rather than emitting SQL that names a constraint it guessed.
   statements
 }
 

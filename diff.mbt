@@ -125,6 +125,10 @@ fn dependency_depth(
           depth = candidate
         }
       }
+      // Unreachable for a validated schema: `validate_schema` rejects a
+      // foreign key whose referenced table is missing, and `build_plan` runs
+      // validation first. Treating it as depth zero keeps the sort total if a
+      // future caller ever reaches this function another way.
       None => ()
     }
   }
@@ -212,6 +216,9 @@ fn risk_for(change : Change) -> (Risk, String) {
           let target = find_column(after.columns, mapping.1)
           match (source, target) {
             (Some(source), Some(target)) => source.data_type != target.data_type
+            // Unreachable: every mapping is built from a column that exists in
+            // both tables. A missing side cannot be judged, so it is not
+            // treated as evidence of data loss.
             _ => false
           }
         }) {
