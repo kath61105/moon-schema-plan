@@ -39,13 +39,16 @@ fabricated by the codebase.
 - ~~replace the placeholder module owner and repository URL~~ — done: the
   module is `kath61105/moon_schema_plan` and the repository is
   `https://github.com/kath61105/moon-schema-plan`
-- create the public GitHub repository and push `main`
-- confirm GitHub Actions is enabled and the CI badge is green
-- register the `kath61105` account on <https://mooncakes.io> (it signs in
-  with GitHub), then `moon publish` and check the rendered documentation. A
-  MoonBit module name is `<owner>/<module>`, and the owner must match a
-  registered account, so this has to happen before the first publish
-- tag a release and attach the demonstration material
+- ~~create the public GitHub repository and push `main`~~ — done:
+  <https://github.com/kath61105/moon-schema-plan>
+- ~~confirm GitHub Actions is enabled and the CI badge is green~~ — done
+- ~~register on mooncakes and publish~~ — done: `kath61105/moon_schema_plan`
+  version 0.2.0 is on <https://mooncakes.io/docs/kath61105/moon_schema_plan>,
+  and a scratch module confirmed that `moon add kath61105/moon_schema_plan`
+  resolves, compiles and runs. A MoonBit module name is `<owner>/<module>` and
+  the owner must match a registered account, which is why registration comes
+  first
+- ~~tag a release~~ — done: `v0.2.0`
 - register on the event's Feishu form with the repository URL, and join the
   official participant group — the rules state that entrants who are not in the
   group may not receive prize money

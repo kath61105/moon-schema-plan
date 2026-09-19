@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/kath61105/moon-schema-plan/actions/workflows/ci.yml/badge.svg)](https://github.com/kath61105/moon-schema-plan/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![mooncakes](https://img.shields.io/badge/mooncakes-0.2.0-brightgreen.svg)](https://mooncakes.io/docs/kath61105/moon_schema_plan)
 
 Deterministic database schema diffing, migration planning and destructive-change
 gates for [MoonBit](https://docs.moonbitlang.com). The library is
