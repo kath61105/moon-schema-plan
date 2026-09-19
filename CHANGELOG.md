@@ -25,6 +25,15 @@ All notable changes to this project are recorded here. The format follows
 - `scripts/project_stats.sh`, which derives the figures the documents quote.
 - A Windows CI job, since the scripts had only run on Linux.
 
+### Added
+
+- Validation rejects a check constraint whose expression still names a column
+  the change drops or renames, which would otherwise fail when the constraint
+  is created.
+- Planning for PostgreSQL rejects an identifier over 63 UTF-8 bytes. PostgreSQL
+  truncates rather than refuses, so two names differing only past that point
+  silently become one object.
+
 ### Fixed
 
 - A SQLite rebuild committed over a broken foreign key. `PRAGMA

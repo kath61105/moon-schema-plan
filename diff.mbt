@@ -391,6 +391,7 @@ fn validate_dialect_transition(
     }
   }
   if dialect == PostgreSQL {
+    issues.push_iter(validate_identifier_lengths(after).iter())
     // `ALTER TABLE ... ADD COLUMN x ... PRIMARY KEY` only works while the table
     // has no primary key; otherwise PostgreSQL refuses the statement outright.
     // Reshaping an existing key needs the constraint's name, which this IR does
@@ -601,6 +602,7 @@ pub fn build_plan(
   issues.push_iter(
     validate_dialect_transition(before, after, hints, dialect).iter(),
   )
+  issues.push_iter(validate_check_references(before, after, hints).iter())
   guard issues.is_empty() else { return Err(sort_issues(issues)) }
   let changes = collect_changes(before, after, hints, dialect)
   let steps = changes.mapi((index, change) => {

@@ -71,8 +71,23 @@ column has no default. The encoder likewise omits them on output, so a schema
 that round-trips through `schema_to_json` is not byte-identical to one written
 by hand, only semantically equal.
 
-Table names beginning with `__msp_new_` are rejected: that prefix is reserved
-for SQLite rebuild staging.
+Table names beginning with `__msp_` are rejected: that prefix is reserved for
+the tables a SQLite rebuild creates.
+
+Two further rules depend on where the schema is going:
+
+- **PostgreSQL identifiers are limited to 63 bytes.** PostgreSQL does not refuse
+  a longer name, it truncates it, so two names differing only past that point
+  become one object. Planning for PostgreSQL rejects any table, column, index or
+  constraint name over the limit. The unit is UTF-8 bytes, so a name of Chinese
+  characters reaches it after 21. SQLite has no such limit and is not
+  restricted.
+- **A check constraint may not name a column the change removes.** A table-level
+  `CHECK` can only reference columns of its own table, so an expression still
+  naming a dropped or renamed column would fail when the constraint is created.
+  The expression is matched for identifier tokens, with string literals skipped
+  and quoted identifiers unwrapped; matching is exact, so a name spelled in a
+  different case is missed rather than guessed at.
 
 Validation reports every problem it finds rather than stopping at the first, so
 a rejected schema can be fixed in one pass. Each issue carries a `path` such as
