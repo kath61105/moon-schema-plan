@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Format, interface and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Report toolchain version
+        run: moon version --all
+
+      - name: Check formatting
+        run: moon fmt --check
+
+      - name: Check that the generated interface is current
+        run: |
+          moon info
+          git diff --exit-code -- '*.mbti'
+
+      - name: Type check without warnings
+        run: moon check --deny-warn
+
+  test:
+    name: Test on ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [wasm, wasm-gc, js, native]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Build every package
+        run: moon build --target ${{ matrix.target }}
+
+      - name: Run the test suite
+        run: moon test --target ${{ matrix.target }} --deny-warn
+
+  end-to-end:
+    name: CLI and real SQLite migration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Install sqlite3
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y sqlite3
+
+      - name: Exercise every documented CLI invocation
+        run: sh scripts/cli_smoke.sh
+
+      - name: Apply generated migrations to a real database
+        run: sh scripts/sqlite_e2e.sh
+
+      - name: Publish the example migration report
+        run: |
+          moon run cmd/main -- plan postgresql \
+            --before examples/schema_v1.json \
+            --after examples/schema_v2.json \
+            --hints examples/rename_hints.json \
+            --allow-destructive --format markdown >> "$GITHUB_STEP_SUMMARY"
