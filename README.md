@@ -211,6 +211,7 @@ runner has no MoonBit registry index, which local development had masked.
 - [Schema, hints and report JSON](docs/schema-format.md)
 - [Architecture and invariants](docs/architecture.md)
 - [Design decisions and their trade-offs](docs/design-decisions.md)
+  ([中文](docs/design-decisions.zh-CN.md))
 - [One-page Chinese contest proposal](docs/proposal.zh-CN.md)
 - [Release and contest checklist](docs/release-checklist.md)
 - [Changelog](CHANGELOG.md)

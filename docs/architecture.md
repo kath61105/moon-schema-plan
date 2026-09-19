@@ -80,8 +80,9 @@ generated SQL into a real `sqlite3` database and checks that the rows survived.
 This page describes what the planner does. The reasoning behind its three most
 opinionated choices — why a rename needs an explicit hint, why a policy
 violation has its own exit code, and why SQLite changes become one table
-rebuild — is in [design-decisions.md](design-decisions.md), together with the
-alternatives that were rejected and what each choice costs.
+rebuild — is in [design-decisions.md](design-decisions.md)
+([中文](design-decisions.zh-CN.md)), together with the alternatives that were
+rejected and what each choice costs.
 
 ## Trust boundary
 

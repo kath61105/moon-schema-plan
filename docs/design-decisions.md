@@ -5,6 +5,9 @@ three of its more opinionated choices were made, what the alternatives were, and
 what each choice costs. Where a decision is enforced by a test or a script, that
 is named, so a reader can check the claim rather than take it on trust.
 
+A Chinese translation of this page is at
+[design-decisions.zh-CN.md](design-decisions.zh-CN.md).
+
 ## Renames require an explicit hint
 
 **What the code does.** `collect_changes` in `diff.mbt` looks up each source
