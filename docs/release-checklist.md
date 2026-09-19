@@ -26,7 +26,7 @@ locally.
   plan emits no SQL at all
 
 Coverage is checked with `moon coverage clean && moon test --enable-coverage &&
-moon coverage report -f summary`. The library stands at 607 of 613 lines; the
+moon coverage report -f summary`. The library stands at 626 of 632 lines; the
 remaining branches are unreachable for a validated schema and are commented as
 such in `diff.mbt`. The CLI is verified through `scripts/cli_smoke.sh` rather
 than unit tests, because its contract is its exit status, not its internals.

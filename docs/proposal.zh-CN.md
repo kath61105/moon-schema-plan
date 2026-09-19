@@ -54,8 +54,8 @@ nullable 改为 required 时，只有目标 schema 给出 default 才允许规�
 
 验收以 `moon check --deny-warn`、`moon fmt --check`、`moon info` 无漂移、四后端编译与
 测试、命令行全部文档化用法与退出码的断言脚本，以及真实 sqlite3 数据迁移为准；
-79 个测试在 wasm、wasm-gc、JavaScript、Native 四个后端上全部通过，库代码行覆盖率
-607/613，其余为已在源码中注明的不可达防御分支。项目为原创实现，不移植第三方代码，
+85 个测试在 wasm、wasm-gc、JavaScript、Native 四个后端上全部通过，库代码行覆盖率
+626/632，其余为已在源码中注明的不可达防御分支。项目为原创实现，不移植第三方代码，
 采用 Apache-2.0。
 
 ## 关键设计取舍

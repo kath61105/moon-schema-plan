@@ -69,7 +69,7 @@ is what lets the planner compile for `wasm`, `wasm-gc`, `js` and `native`, and
 what lets it be embedded in a tool that has its own idea of I/O.
 
 That split is also why the two are tested differently. The library is covered by
-unit and public-API tests (607 of 613 lines; the remainder are branches a
+unit and public-API tests (626 of 632 lines; the remainder are branches a
 validated schema cannot reach, marked as such in the source). The CLI is covered
 by `scripts/cli_smoke.sh`, which asserts observable behaviour — exit status and
 output — rather than internals, and by `scripts/sqlite_e2e.sh`, which pipes the
