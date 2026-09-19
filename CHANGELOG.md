@@ -4,6 +4,44 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## 0.4.0 - 2026-09-19
+
+### Added
+
+- Triggers and views in the schema IR. A table may declare triggers; a schema
+  may declare views. Both are validated, diffed, rendered and dropped, and both
+  are carried verbatim rather than parsed, like every other dialect fragment.
+  A trigger's `timing` and `event` are checked against a fixed set; its
+  `action` is dialect-specific and is the one fragment the delimiter rule does
+  not apply to, because a SQLite trigger body legitimately contains semicolons.
+  Decoding treats `triggers` and `views` as optional, so schema files written
+  against 0.3.0 still read.
+
+### Fixed
+
+- **A SQLite rebuild failed outright against any database holding a view or a
+  trigger that referenced the rebuilt table.** `ALTER TABLE ... RENAME TO`
+  revalidates every view and trigger in the schema, and one pointing at a table
+  that is momentarily missing aborts the statement with `error in view ...: no
+  such table`. `DROP TABLE` also took the table's own triggers with it. A
+  rebuild now drops every declared view and trigger beforehand and recreates
+  them after, as ordinary plan steps. This was not a missing feature but a
+  broken migration in 0.3.0 and earlier.
+- A new table's triggers are created with it, as its indexes already were.
+
+### Changed
+
+- The stated design premise. The invariant was never the list of modelled
+  objects, which has now grown twice; it is that **the planner never parses
+  SQL**. Types, defaults, check expressions, view bodies and trigger actions
+  are all carried verbatim and validated only for what can be checked without
+  parsing them. The README, the architecture note and both design-decision
+  pages say that rather than fixing the IR to four object kinds.
+- Planning for SQLite rejects two tables sharing a trigger name, because SQLite
+  keeps triggers in one database-wide namespace. PostgreSQL scopes a trigger to
+  its table and is not restricted.
+- A view name must not collide with a table name, in either dialect.
+
 ## 0.3.0 - 2026-09-19
 
 ### Added

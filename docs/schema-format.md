@@ -93,6 +93,50 @@ Validation reports every problem it finds rather than stopping at the first, so
 a rejected schema can be fixed in one pass. Each issue carries a `path` such as
 `tables.users.columns.email.data_type`.
 
+## Triggers and views
+
+A table may declare triggers; a schema may declare views. Both are held the way
+every other dialect fragment is — carried verbatim, never parsed.
+
+```json
+{
+  "version": "2",
+  "views": [{ "name": "active_users", "definition": "SELECT id FROM users" }],
+  "tables": [
+    {
+      "name": "users",
+      "columns": [ ... ],
+      "indexes": [],
+      "foreign_keys": [],
+      "checks": [],
+      "triggers": [
+        {
+          "name": "users_audit",
+          "timing": "AFTER",
+          "event": "INSERT",
+          "action": "FOR EACH ROW BEGIN INSERT INTO audit VALUES (1); END"
+        }
+      ]
+    }
+  ]
+}
+```
+
+| Field | Notes |
+| --- | --- |
+| `views[].name` | Unique across the schema, and distinct from every table name: both dialects keep views and tables in one namespace. |
+| `views[].definition` | The body after `AS`. Same delimiter rules as a check expression. |
+| `triggers[].timing` | `BEFORE`, `AFTER` or `INSTEAD OF`. |
+| `triggers[].event` | `INSERT`, `UPDATE` or `DELETE`. |
+| `triggers[].action` | Everything after `ON <table>`, emitted verbatim. **Dialect-specific**: SQLite inlines statements between `BEGIN` and `END`, PostgreSQL executes a function. This is the one fragment the delimiter rule does not apply to, because a SQLite trigger body legitimately contains semicolons — it is taken as trusted configuration. |
+| `triggers[].name` | Unique within its table. Planning for SQLite additionally requires it to be unique across the schema, because SQLite keeps triggers in one database-wide namespace; PostgreSQL scopes a trigger to its table and is not restricted. |
+
+A SQLite rebuild drops every declared view and trigger before the table swap and
+recreates them after, which appears as ordinary steps in the plan. Without that,
+`ALTER TABLE ... RENAME TO` fails against any view or trigger pointing at the
+table. Objects the schema does not declare are lost by a rebuild, and each
+rebuild step says so.
+
 ## Rename hints
 
 The planner never guesses a rename. Without a hint, a disappeared name and a new

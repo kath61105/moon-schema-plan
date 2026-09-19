@@ -38,6 +38,10 @@ pub(all) enum Change {
   DropForeignKey(String, ForeignKey)
   AddCheck(String, CheckConstraint)
   DropCheck(String, CheckConstraint)
+  AddTrigger(String, Trigger)
+  DropTrigger(String, Trigger)
+  AddView(View)
+  DropView(View)
   RebuildTable(Table, Table, Array[(String, String)])
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 pub fn Change::describe(Self) -> String
@@ -133,7 +137,9 @@ pub fn Risk::severity(Self) -> Int
 pub(all) struct Schema {
   version : String
   tables : Array[Table]
-} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+  views : Array[View]
+} derive(Eq, ToJson, @debug.Debug)
+pub impl @json.FromJson for Schema
 
 pub(all) struct Table {
   name : String
@@ -141,12 +147,25 @@ pub(all) struct Table {
   indexes : Array[Index]
   foreign_keys : Array[ForeignKey]
   checks : Array[CheckConstraint]
+  triggers : Array[Trigger]
 } derive(Eq, ToJson, @debug.Debug)
 pub impl @json.FromJson for Table
+
+pub(all) struct Trigger {
+  name : String
+  timing : String
+  event : String
+  action : String
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 
 pub(all) struct ValidationIssue {
   path : String
   message : String
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct View {
+  name : String
+  definition : String
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 
 // Type aliases

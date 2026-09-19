@@ -1,6 +1,10 @@
 ///|
 test "public API plans and renders a safe table creation" {
-  let before = @moon_schema_plan.Schema::{ version: "1", tables: [], }
+  let before = @moon_schema_plan.Schema::{
+    version: "1",
+    tables: [],
+    views: [],
+  }
   let after = @moon_schema_plan.Schema::{
     version: "2",
     tables: [
@@ -19,8 +23,10 @@ test "public API plans and renders a safe table creation" {
         indexes: [],
         foreign_keys: [],
         checks: [],
+        triggers: [],
       },
     ],
+    views: [],
   }
   match @moon_schema_plan.build_plan(before, after, @moon_schema_plan.SQLite) {
     Err(_) => fail("expected public planner to accept the schema")

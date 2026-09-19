@@ -72,7 +72,7 @@ is what lets the planner compile for `wasm`, `wasm-gc`, `js` and `native`, and
 what lets it be embedded in a tool that has its own idea of I/O.
 
 That split is also why the two are tested differently. The library is covered by
-unit and public-API tests (850 of 852 lines; the remainder are branches a
+unit and public-API tests (996 of 998 lines; the remainder are branches a
 validated schema cannot reach, marked as such in the source). The CLI is covered
 by `scripts/cli_smoke.sh`, which asserts observable behaviour — exit status and
 output — rather than internals, and by `scripts/sqlite_e2e.sh`, which pipes the
@@ -89,19 +89,29 @@ rejected and what each choice costs.
 
 ## What the IR models, and what it does not
 
-The IR models tables, columns, indexes, foreign keys and check constraints. It
-does **not** model generated columns, partial-index predicates, triggers or
-views. That boundary is not incidental — it decides what the planner is allowed
-to conclude.
+The IR models tables, columns, indexes, foreign keys, check constraints,
+triggers and views.
+
+The invariant that matters is not the list — that has grown, and may grow again
+— but that **the planner never parses SQL**. A type, a default, a check
+expression, a view body and a trigger action are dialect fragments carried
+verbatim, validated only for what can be checked without parsing. Adding
+triggers and views therefore cost no parser and bought no false portability: a
+trigger action is dialect-specific, because SQLite inlines statements between
+`BEGIN` and `END` while PostgreSQL executes a function.
 
 Two consequences are worth naming, because both are visible in the output:
 
-- A SQLite column drop always becomes a rebuild. Half of SQLite's conditions for
-  refusing a native `DROP COLUMN` involve objects the IR cannot see, so no
-  inspection of the IR can prove the statement would succeed.
-- A rebuild recreates indexes and check constraints, but not triggers or views,
-  which SQLite's own procedure would also recreate. Every rebuild step says so in its `reason`, so
-  an operator reads it in the plan rather than discovering it afterwards.
+- A SQLite column drop always becomes a rebuild. Some of SQLite's conditions for
+  refusing a native `DROP COLUMN` involve things the schema does not describe —
+  a partial index's predicate, a generated column — so no inspection of it can
+  prove the statement would succeed.
+- A SQLite rebuild drops and recreates every declared view and trigger around
+  itself. This is not tidiness: `ALTER TABLE ... RENAME TO` refuses to run while
+  any view or trigger in the schema points at a table that is momentarily
+  missing, so without the bracket the rebuild fails outright. Anything the
+  schema does not declare is still lost, and each rebuild step says so in its
+  `reason`.
 
 ## Trust boundary
 

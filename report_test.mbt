@@ -13,6 +13,7 @@ fn column(
 ///|
 fn users_v1() -> @moon_schema_plan.Schema {
   {
+    views: [],
     version: "1",
     tables: [
       {
@@ -25,6 +26,7 @@ fn users_v1() -> @moon_schema_plan.Schema {
         indexes: [],
         foreign_keys: [],
         checks: [],
+        triggers: [],
       },
     ],
   }
@@ -33,6 +35,7 @@ fn users_v1() -> @moon_schema_plan.Schema {
 ///|
 fn users_v2() -> @moon_schema_plan.Schema {
   {
+    views: [],
     version: "2",
     tables: [
       {
@@ -47,6 +50,7 @@ fn users_v2() -> @moon_schema_plan.Schema {
         ],
         foreign_keys: [],
         checks: [],
+        triggers: [],
       },
     ],
   }
@@ -118,7 +122,11 @@ test "summary counts every step exactly once" {
 
 ///|
 test "an empty plan is safe and reports no steps" {
-  let schema = @moon_schema_plan.Schema::{ version: "1", tables: [], }
+  let schema = @moon_schema_plan.Schema::{
+    version: "1",
+    tables: [],
+    views: [],
+  }
   match @moon_schema_plan.build_plan(schema, schema, @moon_schema_plan.SQLite) {
     Err(_) => fail("expected an empty schema pair to plan")
     Ok(plan) => {
@@ -188,7 +196,11 @@ test "rendered markdown embeds the approved SQL" {
 
 ///|
 test "markdown cells escape pipes in identifiers" {
-  let before = @moon_schema_plan.Schema::{ version: "1", tables: [], }
+  let before = @moon_schema_plan.Schema::{
+    version: "1",
+    tables: [],
+    views: [],
+  }
   let after = @moon_schema_plan.Schema::{
     version: "2",
     tables: [
@@ -198,8 +210,10 @@ test "markdown cells escape pipes in identifiers" {
         indexes: [],
         foreign_keys: [],
         checks: [],
+        triggers: [],
       },
     ],
+    views: [],
   }
   match @moon_schema_plan.build_plan(before, after, @moon_schema_plan.SQLite) {
     Err(_) => fail("expected an unusual but legal identifier to plan")
@@ -220,6 +234,7 @@ test "every change variant has a distinct description" {
       indexes: [],
       foreign_keys: [],
       checks: [],
+      triggers: [],
     }),
     @moon_schema_plan.Change::DropTable({
       name: "t",
@@ -227,6 +242,7 @@ test "every change variant has a distinct description" {
       indexes: [],
       foreign_keys: [],
       checks: [],
+      triggers: [],
     }),
     @moon_schema_plan.Change::RenameTable("t", "u"),
     @moon_schema_plan.Change::AddColumn("t", column("c", "TEXT")),
@@ -265,9 +281,37 @@ test "every change variant has a distinct description" {
     }),
     @moon_schema_plan.Change::AddCheck("t", { name: "c", expression: "v > 0", }),
     @moon_schema_plan.Change::DropCheck("t", { name: "c", expression: "v > 0", }),
+    @moon_schema_plan.Change::AddTrigger("t", {
+      name: "g",
+      timing: "AFTER",
+      event: "INSERT",
+      action: "FOR EACH ROW BEGIN SELECT 1; END",
+    }),
+    @moon_schema_plan.Change::DropTrigger("t", {
+      name: "g",
+      timing: "AFTER",
+      event: "INSERT",
+      action: "FOR EACH ROW BEGIN SELECT 1; END",
+    }),
+    @moon_schema_plan.Change::AddView({ name: "v", definition: "SELECT 1", }),
+    @moon_schema_plan.Change::DropView({ name: "v", definition: "SELECT 1", }),
     @moon_schema_plan.Change::RebuildTable(
-      { name: "t", columns: [], indexes: [], foreign_keys: [], checks: [], },
-      { name: "t", columns: [], indexes: [], foreign_keys: [], checks: [], },
+      {
+        name: "t",
+        columns: [],
+        indexes: [],
+        foreign_keys: [],
+        checks: [],
+        triggers: [],
+      },
+      {
+        name: "t",
+        columns: [],
+        indexes: [],
+        foreign_keys: [],
+        checks: [],
+        triggers: [],
+      },
       [],
     ),
   ].map(change => change.describe())

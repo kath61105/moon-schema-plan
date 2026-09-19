@@ -219,6 +219,90 @@ intact_staging="$(sqlite3 "$intact_db"   "SELECT count(*) FROM sqlite_master WHE
 check 'the successful rebuild left no staging or guard table' '0' "$intact_staging"
 
 
+# Case 6: a rebuild of a table that a view reads, and whose triggers must come
+# back. Before views and triggers were modelled this failed outright: the rename
+# inside the rebuild refuses to run while a view points at a table that is
+# momentarily missing, and DROP TABLE takes the triggers with it.
+cat > "$work_dir/tv_before.json" <<'TVBEFORE'
+{
+  "version": "1",
+  "views": [{"name": "vx", "definition": "SELECT id, v FROM x"}],
+  "tables": [
+    {"name": "log", "indexes": [], "foreign_keys": [], "checks": [], "triggers": [],
+     "columns": [{"name": "msg", "data_type": "TEXT", "nullable": true,
+                  "primary_key": false, "unique": false}]},
+    {"name": "x", "indexes": [], "foreign_keys": [], "checks": [],
+     "columns": [{"name": "id", "data_type": "INTEGER", "nullable": false,
+                  "primary_key": true, "unique": false},
+                 {"name": "v", "data_type": "TEXT", "nullable": true,
+                  "primary_key": false, "unique": false}],
+     "triggers": [{"name": "tx", "timing": "AFTER", "event": "INSERT",
+                   "action": "FOR EACH ROW BEGIN INSERT INTO log VALUES ('ins'); END"}]}
+  ]
+}
+TVBEFORE
+cat > "$work_dir/tv_after.json" <<'TVAFTER'
+{
+  "version": "2",
+  "views": [{"name": "vx", "definition": "SELECT id, v FROM x"}],
+  "tables": [
+    {"name": "log", "indexes": [], "foreign_keys": [], "checks": [], "triggers": [],
+     "columns": [{"name": "msg", "data_type": "TEXT", "nullable": true,
+                  "primary_key": false, "unique": false}]},
+    {"name": "x", "indexes": [], "foreign_keys": [], "checks": [],
+     "columns": [{"name": "id", "data_type": "INTEGER", "nullable": false,
+                  "primary_key": true, "unique": false},
+                 {"name": "v", "data_type": "INTEGER", "nullable": true,
+                  "primary_key": false, "unique": false}],
+     "triggers": [{"name": "tx", "timing": "AFTER", "event": "INSERT",
+                   "action": "FOR EACH ROW BEGIN INSERT INTO log VALUES ('ins'); END"}]}
+  ]
+}
+TVAFTER
+
+tv_db="$work_dir/tv.db"
+sqlite3 "$tv_db"   "CREATE TABLE log (msg TEXT);
+   CREATE TABLE x (id INTEGER PRIMARY KEY NOT NULL, v TEXT);
+   CREATE VIEW vx AS SELECT id, v FROM x;
+   CREATE TRIGGER tx AFTER INSERT ON x
+     BEGIN INSERT INTO log VALUES ('ins'); END;
+   INSERT INTO x VALUES (1, 'a');"
+
+moon run cmd/main -- plan sqlite --before "$work_dir/tv_before.json"   --after "$work_dir/tv_after.json" --allow-destructive > "$work_dir/tv.sql"
+
+set +e
+sqlite3 -bail "$tv_db" < "$work_dir/tv.sql" >/dev/null 2>"$work_dir/tv.err"
+tv_status=$?
+set -e
+
+if [ "$tv_status" != "0" ]; then
+  printf 'FAIL the rebuild failed with a view present
+%s
+'     "$(cat "$work_dir/tv.err")" >&2
+  failures=$((failures + 1))
+else
+  printf 'ok   a table a view reads can still be rebuilt
+'
+fi
+
+tv_objects="$(sqlite3 "$tv_db"   "SELECT group_concat(type || ' ' || name, ',')
+     FROM (SELECT type, name FROM sqlite_master
+            WHERE type IN ('view','trigger') ORDER BY name);" | normalise)"
+check 'the view and the trigger both survive' 'trigger tx,view vx' "$tv_objects"
+
+tv_column="$(sqlite3 "$tv_db"   "SELECT type FROM pragma_table_info('x') WHERE name = 'v';" | normalise)"
+check 'the rebuild actually changed the column' 'INTEGER' "$tv_column"
+
+# The recreated trigger must still fire, not merely exist. The row inserted
+# before the migration already fired it once, so the increment is what matters.
+tv_before_rows="$(sqlite3 "$tv_db" "SELECT count(*) FROM log;" | normalise)"
+sqlite3 "$tv_db" "INSERT INTO x VALUES (2, 7);" >/dev/null
+tv_after_rows="$(sqlite3 "$tv_db" "SELECT count(*) FROM log;" | normalise)"
+check 'the recreated trigger still fires'   "$((tv_before_rows + 1))" "$tv_after_rows"
+
+tv_rows="$(sqlite3 "$tv_db" "SELECT count(*) FROM vx;" | normalise)"
+check 'the recreated view still reads the rebuilt table' '2' "$tv_rows"
+
 if [ "$failures" != "0" ]; then
   printf '\n%s SQLite end-to-end assertions failed\n' "$failures" >&2
   exit 1

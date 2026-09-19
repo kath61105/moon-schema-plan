@@ -11,7 +11,7 @@
 
 name = "kath61105/moon_schema_plan"
 
-version = "0.3.0"
+version = "0.4.0"
 
 readme = "README.md"
 

@@ -49,6 +49,16 @@ fn foreign_key_definition(foreign_key : ForeignKey) -> String {
 }
 
 ///|
+fn trigger_sql(table : String, trigger : Trigger) -> String {
+  "CREATE TRIGGER \{quote_identifier(trigger.name)} \{trigger.timing} \{trigger.event} ON \{quote_identifier(table)} \{trigger.action};"
+}
+
+///|
+fn view_sql(view : View) -> String {
+  "CREATE VIEW \{quote_identifier(view.name)} AS \{view.definition};"
+}
+
+///|
 fn check_definition(check : CheckConstraint) -> String {
   "CONSTRAINT \{quote_identifier(check.name)} CHECK (\{check.expression})"
 }
@@ -192,6 +202,11 @@ fn render_change(change : Change, dialect : Dialect) -> Array[String] {
       for index in table.indexes {
         statements.push(create_index_sql(table.name, index))
       }
+      // A new table's triggers belong to its creation, the same way its
+      // indexes do, rather than arriving as separate steps.
+      for trigger in table.triggers {
+        statements.push(trigger_sql(table.name, trigger))
+      }
       statements
     }
     DropTable(table) => ["DROP TABLE \{quote_identifier(table.name)};"]
@@ -225,6 +240,18 @@ fn render_change(change : Change, dialect : Dialect) -> Array[String] {
       [add_foreign_key_sql(table, foreign_key)]
     AddCheck(table, check) =>
       ["ALTER TABLE \{quote_identifier(table)} ADD \{check_definition(check)};"]
+    AddView(view) => [view_sql(view)]
+    DropView(view) => ["DROP VIEW \{quote_identifier(view.name)};"]
+    AddTrigger(table, trigger) => [trigger_sql(table, trigger)]
+    DropTrigger(table, trigger) =>
+      match dialect {
+        // PostgreSQL scopes a trigger to its table; SQLite's are schema-wide.
+        PostgreSQL =>
+          [
+            "DROP TRIGGER \{quote_identifier(trigger.name)} ON \{quote_identifier(table)};",
+          ]
+        SQLite => ["DROP TRIGGER \{quote_identifier(trigger.name)};"]
+      }
     DropCheck(table, check) =>
       match dialect {
         PostgreSQL =>

@@ -30,6 +30,16 @@ fn find_check(
 }
 
 ///|
+fn find_trigger(triggers : Array[Trigger], name : String) -> Trigger? {
+  triggers.iter().find_first(trigger => trigger.name == name)
+}
+
+///|
+fn find_view(views : Array[View], name : String) -> View? {
+  views.iter().find_first(view => view.name == name)
+}
+
+///|
 fn renamed_table_target(hints : RenameHints, source : String) -> String? {
   for pair in hints.tables {
     if pair.0 == source {
@@ -80,6 +90,7 @@ fn renamed_column_source(
 ///|
 fn change_sort_key(change : Change) -> String {
   match change {
+    DropView(view) => "05:\{view.name}"
     RenameTable(from, to) => "00:\{from}:\{to}"
     AddTable(table) => "10:\{table.name}"
     DropForeignKey(table, foreign_key) => "20:\{table}:\{foreign_key.name}"
@@ -91,6 +102,9 @@ fn change_sort_key(change : Change) -> String {
     AddIndex(table, index) => "50:\{table}:\{index.name}"
     AddForeignKey(table, foreign_key) => "51:\{table}:\{foreign_key.name}"
     DropCheck(table, check) => "22:\{table}:\{check.name}"
+    DropTrigger(table, trigger) => "23:\{table}:\{trigger.name}"
+    AddTrigger(table, trigger) => "53:\{table}:\{trigger.name}"
+    AddView(view) => "60:\{view.name}"
     AddCheck(table, check) => "52:\{table}:\{check.name}"
     RebuildTable(_, after, _) => "45:\{after.name}"
     DropTable(table) => "90:\{table.name}"
@@ -112,6 +126,10 @@ fn change_phase(change : Change) -> Int {
     AddIndex(_, _) => 50
     AddForeignKey(_, _) => 51
     DropCheck(_, _) => 22
+    DropView(_) => 5
+    DropTrigger(_, _) => 23
+    AddTrigger(_, _) => 53
+    AddView(_) => 60
     AddCheck(_, _) => 52
     DropTable(_) => 90
   }
@@ -222,6 +240,12 @@ fn risk_for(change : Change) -> (Risk, String) {
     AddCheck(_, _) =>
       (Review, "existing rows must already satisfy the new check constraint")
     DropCheck(_, _) => (Review, "removes a data-integrity constraint")
+    AddView(_) => (Safe, "creates a view without changing stored data")
+    DropView(_) => (Review, "removes a view that queries may depend on")
+    AddTrigger(_, _) =>
+      (Review, "a trigger changes what every later write to the table does")
+    DropTrigger(_, _) =>
+      (Review, "removes behaviour that later writes relied on")
     RebuildTable(before, after, mappings) =>
       if before.columns.any(column => {
           !mappings.any(mapping => mapping.0 == column.name)
@@ -239,12 +263,12 @@ fn risk_for(change : Change) -> (Risk, String) {
         }) {
         (
           Destructive,
-          "SQLite table rebuild drops a column or converts stored values; triggers and views, which the schema does not model, are not carried over",
+          "SQLite table rebuild drops a column or converts stored values; declared triggers are recreated, but any the schema does not declare are lost",
         )
       } else {
         (
           Review,
-          "SQLite requires an auditable table rebuild for this schema change; triggers and views, which the schema does not model, are not carried over",
+          "SQLite requires an auditable table rebuild for this schema change; declared triggers are recreated, but any the schema does not declare are lost",
         )
       }
   }
@@ -355,6 +379,21 @@ fn validate_dialect_transition(
 ) -> Array[ValidationIssue] {
   let issues : Array[ValidationIssue] = []
   if dialect == SQLite {
+    // SQLite keeps triggers in the same schema-wide namespace as tables and
+    // indexes, so two tables cannot each have a trigger of the same name.
+    // PostgreSQL scopes a trigger to its table and is not restricted here.
+    let seen : Array[String] = []
+    for table in after.tables {
+      for trigger in table.triggers {
+        if has_name(seen, trigger.name) {
+          issues.push({
+            path: "tables.\{table.name}.triggers.\{trigger.name}",
+            message: "trigger name is already used elsewhere; SQLite trigger names are database-wide",
+          })
+        }
+        seen.push(trigger.name)
+      }
+    }
     for target_table in after.tables {
       let source_name = renamed_table_source(hints, target_table.name).unwrap_or(
         target_table.name,
@@ -497,6 +536,21 @@ fn diff_existing_table(
       changes.push(AddCheck(table_name, check))
     }
   }
+  for trigger in before.triggers {
+    match find_trigger(after.triggers, trigger.name) {
+      None => changes.push(DropTrigger(table_name, trigger))
+      Some(target) if target != trigger => {
+        changes.push(DropTrigger(table_name, trigger))
+        changes.push(AddTrigger(table_name, target))
+      }
+      _ => ()
+    }
+  }
+  for trigger in after.triggers {
+    if find_trigger(before.triggers, trigger.name) is None {
+      changes.push(AddTrigger(table_name, trigger))
+    }
+  }
   for index in before.indexes {
     match find_index(after.indexes, index.name) {
       None => changes.push(DropIndex(table_name, index))
@@ -580,6 +634,73 @@ fn collect_changes(
         }
       } else {
         changes.push(AddTable(target_table))
+      }
+    }
+  }
+  for view in before.views {
+    match find_view(after.views, view.name) {
+      None => changes.push(DropView(view))
+      Some(target) if target != view => {
+        changes.push(DropView(view))
+        changes.push(AddView(target))
+      }
+      _ => ()
+    }
+  }
+  for view in after.views {
+    if find_view(before.views, view.name) is None {
+      changes.push(AddView(view))
+    }
+  }
+  // A SQLite rebuild drops and recreates the table, and `ALTER TABLE ... RENAME
+  // TO` refuses to run while any view in the schema references a table that is
+  // momentarily missing. Every declared view is therefore dropped before the
+  // rebuild and recreated after it, whether or not its definition changed. The
+  // churn is visible in the plan rather than hidden inside one step, which is
+  // the point: an operator can see that the views go away and come back.
+  if dialect == SQLite &&
+    changes.iter().any(change => change is RebuildTable(_)) {
+    for view in before.views {
+      if !changes
+        .iter()
+        .any(change => change is DropView({ name, .. }) && name == view.name) {
+        changes.push(DropView(view))
+      }
+    }
+    for view in after.views {
+      if !changes
+        .iter()
+        .any(change => change is AddView({ name, .. }) && name == view.name) {
+        changes.push(AddView(view))
+      }
+    }
+    // Triggers need the same bracket, and for the same reason. A trigger that
+    // reads another table blocks a rebuild of *that* table, not only of its
+    // own: SQLite revalidates every trigger while altering the schema, and one
+    // pointing at a table that is momentarily missing fails the statement. The
+    // trigger on the rebuilt table would also be lost with `DROP TABLE`, so
+    // both cases are covered by dropping every declared trigger first and
+    // recreating it afterwards.
+    for table in before.tables {
+      for trigger in table.triggers {
+        if !changes
+          .iter()
+          .any(change => {
+            change is DropTrigger(_, { name, .. }) && name == trigger.name
+          }) {
+          changes.push(DropTrigger(table.name, trigger))
+        }
+      }
+    }
+    for table in after.tables {
+      for trigger in table.triggers {
+        if !changes
+          .iter()
+          .any(change => {
+            change is AddTrigger(_, { name, .. }) && name == trigger.name
+          }) {
+          changes.push(AddTrigger(table.name, trigger))
+        }
       }
     }
   }

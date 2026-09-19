@@ -53,12 +53,37 @@ pub(all) struct CheckConstraint {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+/// A trigger on a table.
+///
+/// `timing` and `event` are validated against a fixed set because they are the
+/// portable part. `action` is everything after `ON <table>` and is a
+/// dialect-specific fragment: SQLite inlines statements between BEGIN and END,
+/// while PostgreSQL executes a function. It is the one fragment the delimiter
+/// check does not apply to, because a SQLite trigger body legitimately contains
+/// semicolons.
+pub(all) struct Trigger {
+  name : String
+  timing : String
+  event : String
+  action : String
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
+/// A view. `definition` is the body after `AS`, held opaquely like a check
+/// expression.
+pub(all) struct View {
+  name : String
+  definition : String
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
 pub(all) struct Table {
   name : String
   columns : Array[Column]
   indexes : Array[Index]
   foreign_keys : Array[ForeignKey]
   checks : Array[CheckConstraint]
+  triggers : Array[Trigger]
 } derive(Eq, Debug, ToJson)
 
 ///|
@@ -92,6 +117,10 @@ pub impl @json.FromJson for Table with fn from_json(json, path) {
       Some(value) => @json.from_json(value, path=path.add_key("checks"))
       None => []
     },
+    triggers: match fields.get("triggers") {
+      Some(value) => @json.from_json(value, path=path.add_key("triggers"))
+      None => []
+    },
   }
 }
 
@@ -99,7 +128,28 @@ pub impl @json.FromJson for Table with fn from_json(json, path) {
 pub(all) struct Schema {
   version : String
   tables : Array[Table]
-} derive(Eq, Debug, ToJson, FromJson)
+  views : Array[View]
+} derive(Eq, Debug, ToJson)
+
+///|
+/// `views` arrived after 0.3.0 and is optional for the same reason `checks`
+/// was: a stored schema written against an earlier release omits it, and its
+/// absence simply means the schema declares no views.
+pub impl @json.FromJson for Schema with fn from_json(json, path) {
+  guard json is Object(fields) else {
+    raise @json.JsonDecodeError(
+      (path, "expected an object describing a schema"),
+    )
+  }
+  {
+    version: required_field(fields, "version", path),
+    tables: required_field(fields, "tables", path),
+    views: match fields.get("views") {
+      Some(value) => @json.from_json(value, path=path.add_key("views"))
+      None => []
+    },
+  }
+}
 
 ///|
 /// Explicit rename hints prevent the planner from making unsafe guesses.
@@ -128,6 +178,10 @@ pub(all) enum Change {
   DropForeignKey(String, ForeignKey)
   AddCheck(String, CheckConstraint)
   DropCheck(String, CheckConstraint)
+  AddTrigger(String, Trigger)
+  DropTrigger(String, Trigger)
+  AddView(View)
+  DropView(View)
   RebuildTable(Table, Table, Array[(String, String)])
 } derive(Eq, Debug, ToJson, FromJson)
 

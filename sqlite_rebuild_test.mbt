@@ -49,17 +49,18 @@ test "PostgreSQL drops the same column directly" {
 }
 
 ///|
-test "a rebuild states that triggers and views are not recreated" {
-  // SQLite's generalised procedure recreates indexes, triggers and views. The
-  // IR models only indexes, so the plan says so rather than leaving an
-  // operator to discover it after the fact. The reason travels into the SQL
-  // comment, the JSON report and the Markdown report alike.
+test "a rebuild says what it cannot carry over" {
+  // Declared triggers are recreated and declared views are dropped and
+  // recreated around the rebuild. Anything the schema does not declare is
+  // still lost, and the plan says so rather than leaving an operator to
+  // discover it afterwards. The reason travels into the SQL comment, the JSON
+  // report and the Markdown report alike.
   let before = sch("1", [tbl("t", [id_column(), column("v", "TEXT")])])
   let after = sch("2", [tbl("t", [id_column(), column("v", "INTEGER")])])
   let plan = planned(before, after, @moon_schema_plan.SQLite)
-  assert_true(plan.steps[0].reason.contains("triggers and views"))
-  assert_true(sql_for(plan).contains("triggers and views"))
-  assert_true(plan.to_markdown().contains("triggers and views"))
+  assert_true(plan.steps[0].reason.contains("does not declare are lost"))
+  assert_true(sql_for(plan).contains("does not declare are lost"))
+  assert_true(plan.to_markdown().contains("does not declare are lost"))
 }
 
 ///|

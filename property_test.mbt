@@ -64,7 +64,14 @@ fn generated_table(
   if chance(rng, 3) {
     checks.push({ name: "t\{index}_chk0", expression: "c0 IS NOT NULL", })
   }
-  { name: "t\{index}", columns, indexes, foreign_keys: [], checks, }
+  {
+    name: "t\{index}",
+    columns,
+    indexes,
+    foreign_keys: [],
+    checks,
+    triggers: [],
+  }
 }
 
 ///|
@@ -99,7 +106,7 @@ fn generated_schema(
       }
     }
   }
-  { version, tables, }
+  { version, tables, views: [], }
 }
 
 ///|
@@ -114,7 +121,7 @@ fn shuffled_tables(
   for i = tables.length() - 1; i > 0; i = i - 1 {
     tables.swap(i, below(rng, i + 1))
   }
-  { version: schema.version, tables, }
+  { version: schema.version, tables, views: schema.views, }
 }
 
 ///|

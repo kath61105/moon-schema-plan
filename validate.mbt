@@ -114,6 +114,16 @@ fn unsafe_sql_fragment(value : String) -> Bool {
 }
 
 ///|
+fn valid_trigger_timing(timing : String) -> Bool {
+  timing == "BEFORE" || timing == "AFTER" || timing == "INSTEAD OF"
+}
+
+///|
+fn valid_trigger_event(event : String) -> Bool {
+  event == "INSERT" || event == "UPDATE" || event == "DELETE"
+}
+
+///|
 fn valid_reference_action(action : String) -> Bool {
   action == "NO ACTION" ||
   action == "RESTRICT" ||
@@ -154,6 +164,22 @@ pub fn validate_schema(schema : Schema) -> Array[ValidationIssue] {
   let table_names = schema.tables.map(table => table.name)
   issues.push_iter(duplicate_names(table_names, "tables").iter())
   issues.push_iter(duplicate_index_names(schema).iter())
+  let view_names = schema.views.map(view => view.name)
+  issues.push_iter(duplicate_names(view_names, "views").iter())
+  for view in schema.views {
+    if has_name(schema.tables.map(table => table.name), view.name) {
+      issues.push({
+        path: "views.\{view.name}",
+        message: "a view and a table cannot share a name",
+      })
+    }
+    if unsafe_sql_fragment(view.definition) {
+      issues.push({
+        path: "views.\{view.name}.definition",
+        message: "view definition must be non-empty and contain no SQL statement delimiter",
+      })
+    }
+  }
   for table in schema.tables {
     let base = "tables.\{table.name}"
     if table.name.has_prefix("__msp_") {
@@ -182,6 +208,35 @@ pub fn validate_schema(schema : Schema) -> Array[ValidationIssue] {
     issues.push_iter(
       duplicate_names(table.checks.map(check => check.name), "\{base}.checks").iter(),
     )
+    issues.push_iter(
+      duplicate_names(
+        table.triggers.map(trigger => trigger.name),
+        "\{base}.triggers",
+      ).iter(),
+    )
+    for trigger in table.triggers {
+      if !valid_trigger_timing(trigger.timing) {
+        issues.push({
+          path: "\{base}.triggers.\{trigger.name}.timing",
+          message: "timing must be BEFORE, AFTER or INSTEAD OF",
+        })
+      }
+      if !valid_trigger_event(trigger.event) {
+        issues.push({
+          path: "\{base}.triggers.\{trigger.name}.event",
+          message: "event must be INSERT, UPDATE or DELETE",
+        })
+      }
+      // A SQLite trigger body legitimately contains semicolons between BEGIN
+      // and END, so the delimiter rule cannot apply here. The action is taken
+      // as trusted configuration, which the documentation says plainly.
+      if trigger.action.is_empty() {
+        issues.push({
+          path: "\{base}.triggers.\{trigger.name}.action",
+          message: "trigger action must not be empty",
+        })
+      }
+    }
     for check in table.checks {
       if unsafe_sql_fragment(check.expression) {
         issues.push({

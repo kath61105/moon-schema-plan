@@ -17,8 +17,9 @@ fn test_table(
   indexes? : Array[Index] = [],
   foreign_keys? : Array[ForeignKey] = [],
   checks? : Array[CheckConstraint] = [],
+  triggers? : Array[Trigger] = [],
 ) -> Table {
-  { name, columns, indexes, foreign_keys, checks, }
+  { name, columns, indexes, foreign_keys, checks, triggers, }
 }
 
 ///|
@@ -30,6 +31,7 @@ test "schema validation reports duplicate and dangling references" {
         { name: "by_missing", columns: ["missing"], unique: false, },
       ]),
     ],
+    views: [],
   }
   let issues = validate_schema(schema)
   assert_eq(issues.length(), 2)
@@ -46,6 +48,7 @@ test "schema validation rejects unrenderable table and primary key shapes" {
       test_table("bad_key", [test_column("id", primary_key=true)]),
       test_table("__msp_new_reserved", [test_column("value")]),
     ],
+    views: [],
   }
   let issues = validate_schema(schema)
   assert_true(issues.any(issue => issue.path == "version"))
@@ -87,6 +90,7 @@ test "schema validation reports unsafe fragments and malformed foreign keys" {
         ],
       ),
     ],
+    views: [],
   }
   let issues = validate_schema(schema)
   assert_true(
@@ -119,6 +123,7 @@ test "planner classifies safe and destructive column changes" {
         test_column("legacy"),
       ]),
     ],
+    views: [],
   }
   let after = Schema::{
     version: "2",
@@ -128,6 +133,7 @@ test "planner classifies safe and destructive column changes" {
         test_column("email", nullable=false, default_value=Some("''")),
       ]),
     ],
+    views: [],
   }
   match build_plan(before, after, PostgreSQL) {
     Err(_) => fail("expected valid plan")
@@ -147,10 +153,12 @@ test "planner applies only explicit rename hints" {
   let before = Schema::{
     version: "1",
     tables: [test_table("accounts", [test_column("display_name")])],
+    views: [],
   }
   let after = Schema::{
     version: "2",
     tables: [test_table("users", [test_column("name")])],
+    views: [],
   }
   let hints = RenameHints::{
     tables: [("accounts", "users")],
@@ -173,10 +181,12 @@ test "table and column renames are ordered before dependent alterations" {
   let before = Schema::{
     version: "1",
     tables: [test_table("accounts", [test_column("nickname")])],
+    views: [],
   }
   let after = Schema::{
     version: "2",
     tables: [test_table("users", [test_column("name", nullable=false)])],
+    views: [],
   }
   let hints = RenameHints::{
     tables: [("accounts", "users")],
@@ -197,6 +207,7 @@ test "SQLite table rename feeds a subsequent rebuild" {
   let before = Schema::{
     version: "1",
     tables: [test_table("accounts", [test_column("name")])],
+    views: [],
   }
   let after = Schema::{
     version: "2",
@@ -205,6 +216,7 @@ test "SQLite table rename feeds a subsequent rebuild" {
         test_column("name", nullable=false, default_value=Some("'anonymous'")),
       ]),
     ],
+    views: [],
   }
   let hints = RenameHints::{ tables: [("accounts", "users")], columns: [], }
   match build_plan(before, after, SQLite, hints~) {
@@ -240,8 +252,12 @@ test "new tables are ordered by foreign-key dependencies" {
       },
     ],
   )
-  let before = Schema::{ version: "1", tables: [], }
-  let after = Schema::{ version: "2", tables: [users, organizations], }
+  let before = Schema::{ version: "1", tables: [], views: [], }
+  let after = Schema::{
+    version: "2",
+    tables: [users, organizations],
+    views: [],
+  }
   match build_plan(before, after, PostgreSQL) {
     Err(_) => fail("expected valid plan")
     Ok(plan) => {
@@ -256,17 +272,17 @@ test "new tables are ordered by foreign-key dependencies" {
 
 ///|
 test "plans are deterministic across schema declaration order" {
-  let before = Schema::{ version: "1", tables: [], }
+  let before = Schema::{ version: "1", tables: [], views: [], }
   let alpha = test_table("alpha", [test_column("id")])
   let beta = test_table("beta", [test_column("id")])
   let first = build_plan(
     before,
-    Schema::{ version: "2", tables: [beta, alpha], },
+    Schema::{ version: "2", tables: [beta, alpha], views: [], },
     PostgreSQL,
   )
   let second = build_plan(
     before,
-    Schema::{ version: "2", tables: [alpha, beta], },
+    Schema::{ version: "2", tables: [alpha, beta], views: [], },
     PostgreSQL,
   )
   assert_eq(first, second)
@@ -287,8 +303,8 @@ test "dropped tables use reverse foreign-key dependency order" {
       on_update: None,
     },
   ])
-  let before = Schema::{ version: "1", tables: [parents, children], }
-  let after = Schema::{ version: "2", tables: [], }
+  let before = Schema::{ version: "1", tables: [parents, children], views: [], }
+  let after = Schema::{ version: "2", tables: [], views: [], }
   match build_plan(before, after, PostgreSQL) {
     Err(_) => fail("expected valid removal plan")
     Ok(plan) => {
@@ -334,8 +350,8 @@ test "PostgreSQL defers foreign keys until all new tables exist" {
       },
     ],
   )
-  let before = Schema::{ version: "1", tables: [], }
-  let after = Schema::{ version: "2", tables: [left, right], }
+  let before = Schema::{ version: "1", tables: [], views: [], }
+  let after = Schema::{ version: "2", tables: [left, right], views: [], }
   match build_plan(before, after, PostgreSQL) {
     Err(_) => fail("expected valid cyclic schema plan")
     Ok(plan) => {
@@ -354,6 +370,7 @@ test "SQLite rejects an unpopulatable new required column" {
     tables: [
       test_table("users", [test_column("id", nullable=false, primary_key=true)]),
     ],
+    views: [],
   }
   let after = Schema::{
     version: "2",
@@ -363,6 +380,7 @@ test "SQLite rejects an unpopulatable new required column" {
         test_column("email", nullable=false),
       ]),
     ],
+    views: [],
   }
   match build_plan(before, after, SQLite) {
     Ok(_) => fail("expected an actionable planning error")
@@ -379,10 +397,12 @@ test "SQLite rejects a required transition without a backfill default" {
   let before = Schema::{
     version: "1",
     tables: [test_table("users", [test_column("email")])],
+    views: [],
   }
   let after = Schema::{
     version: "2",
     tables: [test_table("users", [test_column("email", nullable=false)])],
+    views: [],
   }
   match build_plan(before, after, SQLite) {
     Ok(_) => fail("expected a missing-backfill error")
@@ -398,8 +418,13 @@ test "rename hints must form one-to-one mappings" {
   let before = Schema::{
     version: "1",
     tables: [test_table("a", []), test_table("b", [])],
+    views: [],
   }
-  let after = Schema::{ version: "2", tables: [test_table("c", [])], }
+  let after = Schema::{
+    version: "2",
+    tables: [test_table("c", [])],
+    views: [],
+  }
   let hints = RenameHints::{ tables: [("a", "c"), ("b", "c")], columns: [], }
   match build_plan(before, after, PostgreSQL, hints~) {
     Ok(_) => fail("expected ambiguous hint rejection")
@@ -414,7 +439,7 @@ test "rename hints must form one-to-one mappings" {
 
 ///|
 test "invalid rename hint prevents partial planning" {
-  let schema = Schema::{ version: "1", tables: [], }
+  let schema = Schema::{ version: "1", tables: [], views: [], }
   let hints = RenameHints::{
     tables: [("missing", "also_missing")],
     columns: [],
@@ -433,10 +458,12 @@ test "rename hints reject existing table and column targets" {
       test_table("accounts", [test_column("old"), test_column("name")]),
       test_table("users", [test_column("id")]),
     ],
+    views: [],
   }
   let after = Schema::{
     version: "2",
     tables: [test_table("users", [test_column("name")])],
+    views: [],
   }
   let hints = RenameHints::{
     tables: [("accounts", "users")],
@@ -456,10 +483,12 @@ test "destructive SQL is blocked by default" {
   let before = Schema::{
     version: "1",
     tables: [test_table("events", [test_column("id"), test_column("payload")])],
+    views: [],
   }
   let after = Schema::{
     version: "2",
     tables: [test_table("events", [test_column("id")])],
+    views: [],
   }
   match build_plan(before, after, PostgreSQL) {
     Err(_) => fail("expected valid plan")
@@ -476,7 +505,7 @@ test "destructive SQL is blocked by default" {
 
 ///|
 test "PostgreSQL renderer quotes identifiers and emits ordered SQL" {
-  let before = Schema::{ version: "1", tables: [], }
+  let before = Schema::{ version: "1", tables: [], views: [], }
   let after = Schema::{
     version: "2",
     tables: [
@@ -494,6 +523,7 @@ test "PostgreSQL renderer quotes identifiers and emits ordered SQL" {
         indexes=[{ name: "user_email_idx", columns: ["email"], unique: true, }],
       ),
     ],
+    views: [],
   }
   match build_plan(before, after, PostgreSQL) {
     Err(_) => fail("expected valid plan")
@@ -517,6 +547,7 @@ test "PostgreSQL backfills nulls before adding a required constraint" {
   let before = Schema::{
     version: "1",
     tables: [test_table("users", [test_column("name")])],
+    views: [],
   }
   let after = Schema::{
     version: "2",
@@ -525,6 +556,7 @@ test "PostgreSQL backfills nulls before adding a required constraint" {
         test_column("name", nullable=false, default_value=Some("'anonymous'")),
       ]),
     ],
+    views: [],
   }
   match build_plan(before, after, PostgreSQL) {
     Err(_) => fail("expected valid plan")
@@ -547,10 +579,12 @@ test "renderer blocks unnamed key-constraint alterations" {
   let before = Schema::{
     version: "1",
     tables: [test_table("users", [test_column("email")])],
+    views: [],
   }
   let after = Schema::{
     version: "2",
     tables: [test_table("users", [test_column("email", unique=true)])],
+    views: [],
   }
   match build_plan(before, after, PostgreSQL) {
     Err(_) => fail("expected valid plan")
@@ -573,6 +607,7 @@ test "SQLite uses a transactional rebuild for incompatible alteration" {
         test_column("quantity", data_type="TEXT"),
       ]),
     ],
+    views: [],
   }
   let after = Schema::{
     version: "2",
@@ -582,6 +617,7 @@ test "SQLite uses a transactional rebuild for incompatible alteration" {
         test_column("quantity", data_type="INTEGER"),
       ]),
     ],
+    views: [],
   }
   match build_plan(before, after, SQLite) {
     Err(_) => fail("expected valid plan")
@@ -614,6 +650,7 @@ test "schema JSON representation round trips" {
     tables: [
       test_table("users", [test_column("id", nullable=false, primary_key=true)]),
     ],
+    views: [],
   }
   let encoded = schema_to_json(schema)
   inspect(
@@ -635,9 +672,11 @@ test "schema JSON representation round trips" {
       #|      ],
       #|      "indexes": [],
       #|      "foreign_keys": [],
-      #|      "checks": []
+      #|      "checks": [],
+      #|      "triggers": []
       #|    }
-      #|  ]
+      #|  ],
+      #|  "views": []
       #|}
     ),
   )

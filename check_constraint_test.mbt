@@ -99,7 +99,7 @@ test "SQLite rebuilds when a check constraint changes" {
 }
 
 ///|
-test "a rebuild carries check constraints over but not triggers or views" {
+test "a rebuild carries check constraints over" {
   let constrained = (data_type : String) => {
     tbl("orders", [id_column(), column("quantity", data_type)], checks=[
       check_of("orders_quantity_positive", "quantity > 0"),
@@ -111,8 +111,8 @@ test "a rebuild carries check constraints over but not triggers or views" {
     @moon_schema_plan.SQLite,
   )
   assert_true(sql_for(plan).contains("CHECK (quantity > 0)"))
-  assert_true(plan.steps[0].reason.contains("triggers and views"))
-  assert_false(plan.steps[0].reason.contains("check constraints"))
+  assert_true(plan.steps[0].reason.contains("does not declare are lost"))
+  assert_false(plan.steps[0].reason.contains("check constraint"))
 }
 
 ///|

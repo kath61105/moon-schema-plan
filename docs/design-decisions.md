@@ -139,7 +139,7 @@ what this project's schema IR can actually see:
 | The column is named in a partial index's `WHERE` clause | **No** — index predicates are not modelled |
 | The column is named in a `CHECK` constraint | Yes, for constraints the schema declares — but not for any the real table also carries |
 | The column is used in a generated column's expression | **No** — generated columns are not modelled |
-| The column appears in a trigger or a view | **No** — neither is modelled |
+| The column appears in a trigger or a view | Only for ones the schema declares, not for any the real database also holds |
 
 Half of them are invisible, and the check-constraint row is only half visible:
 the IR knows the constraints the schema declares, not any the real table also
@@ -162,25 +162,31 @@ contains no `DROP COLUMN`. The same file asserts the contrast, that PostgreSQL
 does drop the identical column directly, so the rebuild reads as a dialect
 constraint rather than a house style.
 
-### What the rebuild does not carry over
+### Why a rebuild brackets every view and trigger
 
-SQLite's generalised procedure recreates indexes, **triggers and views**. This
-planner recreates indexes only, because the IR models indexes and does not model
-triggers or views. `DROP TABLE` removes a table's triggers, and a view over the
-old table survives but is left referring to a shape that no longer exists.
-
-Rather than leave that to be discovered afterwards, every rebuild step says so
-in its `reason`, which travels into the SQL comment, the JSON report and the
-Markdown review document alike:
+SQLite's generalised procedure recreates indexes, triggers and views, and this
+planner does the same for the ones the schema declares — but not only to be
+tidy. Without it the rebuild simply fails:
 
 ```
--- step-1 [review] SQLite requires an auditable table rebuild for this schema
--- change; triggers and views on the table are not recreated
+Runtime error: error in view vx: no such table: main.x
 ```
 
-A table carrying triggers or views therefore needs an operator to reinstate them
-as part of the migration. That is a real limitation of the IR's scope, and the
-plan states it rather than implying completeness it does not have.
+`ALTER TABLE ... RENAME TO` revalidates every view and trigger in the schema,
+and one pointing at a table that is momentarily missing aborts the statement.
+`DROP TABLE` also takes the table's own triggers with it, and a trigger on
+*another* table that reads the rebuilt one blocks it just the same. So a rebuild
+emits a `DROP VIEW` and `DROP TRIGGER` for everything declared, then recreates
+it afterwards, as ordinary plan steps rather than hidden inside one:
+
+```
+drop view vx · rebuild table x · create view vx
+```
+
+Anything the schema does not declare is still lost, and each rebuild step says
+so in its `reason`. `scripts/sqlite_e2e.sh` migrates a database that has both a
+view and a trigger, and checks that the trigger still fires and the view still
+reads afterwards; removing the bracket brings the error above straight back.
 
 **How it is verified.** `scripts/sqlite_e2e.sh` pipes the generated SQL into a
 real `sqlite3` database and asserts that rows survive, the backfill applied, the

@@ -155,24 +155,30 @@ operational review. It makes the decision explicit; a human still makes it.
 
 ## Scope
 
-The schema IR covers tables, columns, indexes and foreign keys. Planning covers
-creating, dropping and renaming tables and columns, altering columns, index and
-foreign-key changes, and SQLite table rebuilds, for PostgreSQL and SQLite.
+The IR models tables, columns, indexes, foreign keys, check constraints,
+triggers and views. Planning covers creating, dropping and renaming tables and
+columns, altering columns, index, foreign-key, check, trigger and view changes,
+and SQLite table rebuilds, for PostgreSQL and SQLite.
 
-The IR models tables, columns, indexes, foreign keys and check constraints. It
-does not model generated columns, partial-index predicates, triggers or views.
-Two consequences show up in the output: a SQLite column drop always becomes a
-rebuild rather than a native `DROP COLUMN`, because half of SQLite's conditions
-for refusing that statement involve objects the IR cannot see; and a rebuild
-recreates indexes but not triggers or views, which each rebuild step states in
-its reason. [docs/design-decisions.md](docs/design-decisions.md) works through
-both.
+The invariant is not which objects are modelled but **that the planner never
+parses SQL**. A type, a default, a check expression, a view body and a trigger
+action are all carried verbatim and validated only for what can be checked
+without parsing them. That is why adding triggers and views did not require a
+SQL parser, and why it does not pretend to portability it lacks: a trigger
+action is dialect-specific, because SQLite inlines statements while PostgreSQL
+executes a function.
+
+Generated columns and partial-index predicates remain unmodelled. One
+consequence shows up in the output: a SQLite column drop always becomes a
+rebuild rather than a native `DROP COLUMN`, because some of SQLite's conditions
+for refusing that statement involve things the schema does not describe.
+[docs/design-decisions.md](docs/design-decisions.md) works through it.
 
 This release deliberately does **not** connect to a live database, parse
 arbitrary DDL, infer renames, migrate business data, or support MySQL.
 Introspection belongs in optional adapters; the planner stays a pure,
-cross-target function. Column types and default expressions are dialect SQL
-fragments from trusted configuration — this is a planner, not a SQL firewall.
+cross-target function. Dialect fragments come from trusted configuration — this
+is a planner, not a SQL firewall.
 
 ## Development
 
@@ -212,7 +218,7 @@ classification, the SQLite and PostgreSQL renderers, a demo CLI, and 23 tests,
 totalling 1,970 lines of MoonBit. Nothing was ever published from that state:
 there was no repository, no CI, no release and no registry entry.
 
-Every commit after it — 28 so far, changing 43 files by +5,520/-291 lines — was
+Every commit after it — 30 so far, changing 44 files by +6,000/-300 lines — was
 written during this period. That work is:
 
 - the risk-policy layer (`Risk::severity`/`parse`, `Plan::summary`,
@@ -223,7 +229,7 @@ written during this period. That work is:
   `--out`, and distinct exit codes for a policy violation and a real error;
 - CHECK constraints in the schema IR, which a SQLite rebuild used to drop in
   silence;
-- the test suite going from 23 to 140 tests, library coverage to 850/852 lines
+- the test suite going from 23 to 159 tests, library coverage to 996/998 lines
   and the CLI from none to 67/196, including four property-based checks of the
   determinism, gate and identity claims;
 - real database execution for both dialects, which is how every renderer defect

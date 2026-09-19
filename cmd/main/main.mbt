@@ -9,7 +9,7 @@ const EXIT_POLICY : Int = 2
 ///|
 /// Kept equal to `version` in moon.mod by an assertion in
 /// `scripts/cli_smoke.sh`, because nothing at run time can read the manifest.
-const VERSION : String = "0.3.0"
+const VERSION : String = "0.4.0"
 
 ///|
 fn usage() -> String {
@@ -425,8 +425,10 @@ fn demo() -> String {
         indexes: [],
         foreign_keys: [],
         checks: [],
+        triggers: [],
       },
     ],
+    views: [],
   }
   let after = @lib.Schema::{
     version: "2",
@@ -460,8 +462,10 @@ fn demo() -> String {
         ],
         foreign_keys: [],
         checks: [],
+        triggers: [],
       },
     ],
+    views: [],
   }
   let hints = @lib.RenameHints::{
     tables: [],

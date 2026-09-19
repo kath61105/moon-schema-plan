@@ -287,7 +287,65 @@ if grep -q 'CREATE TABLE' "$work_dir/loose_fk.sql"; then
   failures=$((failures + 1))
 fi
 
-psql_run -c "DROP SCHEMA IF EXISTS msp_example, msp_composite, msp_cycle, msp_check CASCADE;" \
+# Case 7: views and triggers. PostgreSQL executes a function from a trigger
+# rather than inlining statements, so the action fragment looks nothing like
+# SQLite's -- which is the reason it is carried verbatim instead of modelled.
+fresh_schema msp_objects
+psql_run -c "
+  CREATE TABLE log (msg TEXT);
+  CREATE FUNCTION msp_objects.audit() RETURNS trigger AS \$\$
+    BEGIN INSERT INTO msp_objects.log VALUES ('ins'); RETURN NEW; END;
+  \$\$ LANGUAGE plpgsql;" >/dev/null
+
+cat > "$work_dir/objects.json" <<'OBJECTS'
+{
+  "version": "2",
+  "views": [{"name": "vx", "definition": "SELECT id FROM x"}],
+  "tables": [
+    {"name": "x", "indexes": [], "foreign_keys": [], "checks": [],
+     "columns": [{"name": "id", "data_type": "INTEGER", "nullable": false,
+                  "primary_key": true, "unique": false}],
+     "triggers": [{"name": "x_audit", "timing": "AFTER", "event": "INSERT",
+                   "action": "FOR EACH ROW EXECUTE FUNCTION audit()"}]}
+  ]
+}
+OBJECTS
+
+moon run cmd/main -- plan postgresql   --before-json '{"version":"1","tables":[]}'   --after "$work_dir/objects.json" > "$work_dir/objects.sql"
+
+if apply "$work_dir/objects.sql"; then
+  view_present="$(psql_run -c "
+    SELECT count(*) FROM pg_views
+    WHERE schemaname = 'msp_objects' AND viewname = 'vx';" | normalise)"
+  check 'the view exists' '1' "$view_present"
+
+  trigger_present="$(psql_run -c "
+    SELECT count(*) FROM pg_trigger
+    WHERE tgrelid = 'msp_objects.x'::regclass AND NOT tgisinternal;" | normalise)"
+  check 'the trigger exists' '1' "$trigger_present"
+
+  # It must fire, not merely exist.
+  psql_run -c "INSERT INTO x VALUES (1);" >/dev/null
+  fired="$(psql_run -c "SELECT count(*) FROM log;" | normalise)"
+  check 'the trigger fires' '1' "$fired"
+
+  rows="$(psql_run -c "SELECT count(*) FROM vx;" | normalise)"
+  check 'the view reads the table' '1' "$rows"
+
+  # Dropping a trigger names its table in PostgreSQL, unlike in SQLite.
+  moon run cmd/main -- plan postgresql --before "$work_dir/objects.json"     --after-json '{"version":"3","views":[],"tables":[{"name":"x","indexes":[],
+      "foreign_keys":[],"checks":[],"triggers":[],
+      "columns":[{"name":"id","data_type":"INTEGER","nullable":false,
+                  "primary_key":true,"unique":false}]}]}'     --allow-destructive > "$work_dir/objects_drop.sql"
+  if apply "$work_dir/objects_drop.sql"; then
+    remaining="$(psql_run -c "
+      SELECT count(*) FROM pg_trigger
+      WHERE tgrelid = 'msp_objects.x'::regclass AND NOT tgisinternal;" | normalise)"
+    check 'the trigger is dropped with its table named' '0' "$remaining"
+  fi
+fi
+
+psql_run -c "DROP SCHEMA IF EXISTS msp_example, msp_composite, msp_cycle, msp_check, msp_objects CASCADE;" \
   >/dev/null 2>&1 || true
 
 if [ "$failures" != "0" ]; then

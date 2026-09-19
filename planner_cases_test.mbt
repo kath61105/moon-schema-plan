@@ -10,16 +10,18 @@ fn tbl(
   indexes? : Array[@moon_schema_plan.Index] = [],
   foreign_keys? : Array[@moon_schema_plan.ForeignKey] = [],
   checks? : Array[@moon_schema_plan.CheckConstraint] = [],
+  triggers? : Array[@moon_schema_plan.Trigger] = [],
 ) -> @moon_schema_plan.Table {
-  { name, columns, indexes, foreign_keys, checks, }
+  { name, columns, indexes, foreign_keys, checks, triggers, }
 }
 
 ///|
 fn sch(
   version : String,
   tables : Array[@moon_schema_plan.Table],
+  views? : Array[@moon_schema_plan.View] = [],
 ) -> @moon_schema_plan.Schema {
-  { version, tables, }
+  { version, tables, views, }
 }
 
 ///|
@@ -560,4 +562,10 @@ test "schema JSON survives a round trip through the public helpers" {
     _ => abort("expected the derived JSON encoding to round trip")
   }
   assert_eq(restored, schema)
+}
+
+///|
+/// The offset of `needle`, failing with the text it looked for when absent.
+fn String::index_of_or_fail(self : String, needle : String) -> Int {
+  offset_of(self, needle)
 }

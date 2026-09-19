@@ -179,6 +179,16 @@ fn validate_identifier_lengths(schema : Schema) -> Array[ValidationIssue] {
     for check in table.checks {
       check_name("\{base}.checks.\{check.name}", "constraint name", check.name)
     }
+    for trigger in table.triggers {
+      check_name(
+        "\{base}.triggers.\{trigger.name}",
+        "trigger name",
+        trigger.name,
+      )
+    }
+  }
+  for view in schema.views {
+    check_name("views.\{view.name}", "view name", view.name)
   }
   issues
 }

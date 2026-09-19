@@ -109,7 +109,7 @@ SQLite 文档列出了 `DROP COLUMN` 会失败的八种情形。按本项目的 
 | 该列出现在部分索引的 `WHERE` 谓词中 | **不能** —— 索引谓词未建模 |
 | 该列出现在 `CHECK` 约束中 | 能看见 schema 声明的那些——但看不见真实表另外带的 |
 | 该列被生成列的表达式使用 | **不能** —— 生成列未建模 |
-| 该列出现在触发器或视图中 | **不能** —— 两者都未建模 |
+| 该列出现在触发器或视图中 | 只看得见 schema 声明的，看不见真实库里另外还有的 |
 
 八种里有一半是不可见的，而 CHECK 约束那一行只能算看见一半：IR 知道 schema 声明了哪些约束，
 却不知道真实表另外还带着哪些。只依据看得见的部分来放行，就会对一个仍被触发器、视图或未声明的
@@ -125,22 +125,27 @@ SQLite 文档列出了 `DROP COLUMN` 会失败的八种情形。按本项目的 
 不含 `DROP COLUMN`。同一个文件还断言了对照组：PostgreSQL 对同一个列就是直接 DROP COLUMN。
 这样一来，重建读起来是方言约束，而不是某种个人风格。
 
-### 重建不会带过去的东西
+### 为什么重建要把每个视图和触发器括起来
 
-SQLite 的通用流程会重建索引、**触发器和视图**。本规划器只重建索引，因为 IR 建模了索引，
-而没有建模触发器和视图。`DROP TABLE` 会一并删掉该表的触发器；而建立在旧表之上的视图虽然还在，
-却指向了一个已不复存在的结构。
-
-与其留给事后发现，每一个重建步骤都会在自己的 `reason` 里讲明这点，并且这段说明会一路进入
-SQL 注释、JSON 报告和 Markdown 评审文档：
+SQLite 的通用流程会重建索引、触发器和视图，本规划器对**schema 声明过的**那些做同样的事——
+但这不是为了整洁。不这么做，重建根本跑不完：
 
 ```
--- step-1 [review] SQLite requires an auditable table rebuild for this schema
--- change; triggers and views on the table are not recreated
+Runtime error: error in view vx: no such table: main.x
 ```
 
-因此，带有触发器或视图的表，需要由操作者在迁移中把它们重新建立起来。这是 IR 建模范围的一个
-真实局限，计划把它说出来，而不是暗示一种它并不具备的完备性。
+`ALTER TABLE ... RENAME TO` 会重新校验 schema 里的每一个视图和触发器，其中任何一个指向
+「此刻不存在的表」都会让该语句失败。`DROP TABLE` 还会顺带删掉该表自己的触发器；而**另一张表
+上**、读取被重建表的触发器，同样会挡住重建。所以重建会先对所有已声明的视图和触发器发出
+`DROP VIEW` / `DROP TRIGGER`，事后再重建回来——而且是作为普通的计划步骤，不藏在某一步内部：
+
+```
+drop view vx · rebuild table x · create view vx
+```
+
+schema 没有声明的，仍然会丢，每个重建步骤的 `reason` 都会讲明这点。
+`scripts/sqlite_e2e.sh` 会迁移一个同时带视图和触发器的数据库，并检查事后触发器仍会触发、
+视图仍可查询；把这个括号去掉，上面那条报错立刻就会回来。
 
 **如何验证。** `scripts/sqlite_e2e.sh` 把生成的 SQL 灌入真实的 `sqlite3` 数据库，断言行仍然
 存在、回填已生效、legacy 列已删除、索引已重建、没有残留的暂存表，且 `integrity_check`

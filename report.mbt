@@ -116,6 +116,10 @@ pub fn Change::describe(self : Change) -> String {
       "drop foreign key \{foreign_key.name} on \{table}"
     AddCheck(table, check) => "add check \{check.name} on \{table}"
     DropCheck(table, check) => "drop check \{check.name} on \{table}"
+    AddTrigger(table, trigger) => "add trigger \{trigger.name} on \{table}"
+    DropTrigger(table, trigger) => "drop trigger \{trigger.name} on \{table}"
+    AddView(view) => "create view \{view.name}"
+    DropView(view) => "drop view \{view.name}"
     RebuildTable(_, after, _) => "rebuild table \{after.name}"
   }
 }
