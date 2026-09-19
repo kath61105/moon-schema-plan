@@ -41,11 +41,48 @@ fn has_name(names : Array[String], wanted : String) -> Bool {
 }
 
 ///|
+/// Reject a fragment that could end the statement it is embedded in.
+///
+/// A default or check expression legitimately contains a string literal, and
+/// `'a--b'` or `'x;y'` are ordinary values, so the scan tracks quoting and
+/// judges only what falls outside a literal. An unterminated literal is
+/// rejected as well, because it would swallow whatever the renderer appends
+/// after it.
 fn unsafe_sql_fragment(value : String) -> Bool {
-  value == "" ||
-  value.contains(";") ||
-  value.contains("--") ||
-  value.contains("/*")
+  if value.is_empty() {
+    return true
+  }
+  let characters = value.to_array()
+  let mut index = 0
+  let mut inside_literal = false
+  while index < characters.length() {
+    let current = characters[index]
+    let next = if index + 1 < characters.length() {
+      Some(characters[index + 1])
+    } else {
+      None
+    }
+    if inside_literal {
+      if current == '\'' {
+        // Two quotes inside a literal are an escaped quote, not its end.
+        if next is Some('\'') {
+          index = index + 1
+        } else {
+          inside_literal = false
+        }
+      }
+    } else if current == '\'' {
+      inside_literal = true
+    } else if current == ';' {
+      return true
+    } else if current == '-' && next is Some('-') {
+      return true
+    } else if current == '/' && next is Some('*') {
+      return true
+    }
+    index = index + 1
+  }
+  inside_literal
 }
 
 ///|

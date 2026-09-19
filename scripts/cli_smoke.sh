@@ -45,6 +45,21 @@ hints=examples/rename_hints.json
 run 0 'help' -- help
 expect_output 'moon-schema-plan plan'
 
+run 0 'version reports the build' -- version
+expect_output 'moon-schema-plan '
+
+# The CLI cannot read moon.mod at run time, so the two are checked against
+# each other here rather than trusted to stay in step.
+manifest_version="$(grep '^version = ' moon.mod | head -1 | cut -d"\"" -f2)"
+reported_version="$(sed -n 's/^moon-schema-plan //p' "$work_dir/last_output")"
+if [ "$manifest_version" != "$reported_version" ]; then
+  printf 'FAIL version drift: moon.mod says %s, the binary says %s\n' \
+    "$manifest_version" "$reported_version" >&2
+  failures=$((failures + 1))
+else
+  printf 'ok   the reported version matches moon.mod (%s)\n' "$manifest_version"
+fi
+
 run 0 'demo renders the SQLite example' -- demo
 expect_output 'CREATE TABLE'
 
@@ -138,6 +153,28 @@ if ! grep -q 'ALTER TABLE' "$work_dir/plan.sql"; then
   printf 'FAIL --out did not write the rendered SQL\n' >&2
   failures=$((failures + 1))
 fi
+
+# Diagnostics share stdout with the SQL, because the wasm backend has no
+# portable stderr. Every line a failing run writes must therefore be a SQL
+# comment, so that `plan ... | sqlite3` cannot be fed a stray message.
+check_output_is_inert() {
+  description="$1"
+  if grep -qv '^--' "$work_dir/last_output" 2>/dev/null; then
+    printf 'FAIL %s wrote a line that is not a SQL comment:\n%s\n' \
+      "$description" "$(grep -v '^--' "$work_dir/last_output" | head -3)" >&2
+    failures=$((failures + 1))
+  else
+    printf 'ok   %s writes only SQL comments\n' "$description"
+  fi
+}
+
+run 1 'a failing plan writes nothing a database would execute' -- \
+  plan postgresql --before "$work_dir/absent.json" --after "$after"
+check_output_is_inert 'a failing plan'
+
+run 2 'a blocked plan writes nothing a database would execute' -- \
+  plan postgresql --before "$before" --after "$after" --hints "$hints"
+check_output_is_inert 'a blocked plan'
 
 if [ "$failures" != "0" ]; then
   printf '\n%s CLI smoke assertions failed\n' "$failures" >&2

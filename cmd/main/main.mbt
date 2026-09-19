@@ -7,6 +7,11 @@ const EXIT_USAGE : Int = 1
 const EXIT_POLICY : Int = 2
 
 ///|
+/// Kept equal to `version` in moon.mod by an assertion in
+/// `scripts/cli_smoke.sh`, because nothing at run time can read the manifest.
+const VERSION : String = "0.3.0"
+
+///|
 fn usage() -> String {
   (
     #|moon-schema-plan: deterministic schema diff and safe SQL planning
@@ -16,6 +21,7 @@ fn usage() -> String {
     #|  moon-schema-plan verify <sqlite|postgresql> [options]
     #|  moon-schema-plan demo
     #|  moon-schema-plan help
+    #|  moon-schema-plan version
     #|
     #|Schema input (choose one form per schema):
     #|  --before <path>         read the source schema from a JSON file
@@ -55,8 +61,22 @@ fn[T] exit_with(code : Int) -> T {
 }
 
 ///|
+/// MoonBit's wasm backend has no portable stderr, so diagnostics share stdout
+/// with the SQL. Every diagnostic line is therefore written as a SQL comment:
+/// a pipeline such as `plan ... | sqlite3` cannot be fed a stray message, the
+/// database ignores whatever arrives, and the non-zero exit still stops the
+/// build. Writing the migration to a file with `--out` remains the better
+/// habit, and the README says so.
+fn diagnostic(message : String) -> Unit {
+  for line in message.split("\n") {
+    println("-- \{line}")
+  }
+}
+
+///|
 fn[T] fail_cli(message : String) -> T {
-  println(message)
+  diagnostic(message)
+  diagnostic("run `moon-schema-plan help` for usage")
   exit_with(EXIT_USAGE)
 }
 
@@ -82,15 +102,7 @@ fn write_output(text : String, out : String?) -> Unit {
 fn parse_dialect(value : String) -> @lib.Dialect {
   match @lib.Dialect::parse(value) {
     Some(dialect) => dialect
-    None => fail_cli("unsupported dialect: \{value}\n\{usage()}")
-  }
-}
-
-///|
-fn parse_max_risk(value : String) -> @lib.Risk {
-  match @lib.Risk::parse(value) {
-    Some(risk) => risk
-    None => fail_cli("unsupported risk level: \{value}\n\{usage()}")
+    None => fail_cli("unsupported dialect: \{value}")
   }
 }
 
@@ -115,15 +127,25 @@ fn parse_hints(source : String, origin : String) -> @lib.RenameHints {
 }
 
 ///|
-/// One schema argument, kept together with where it came from so that every
-/// diagnostic can name the file or flag the operator actually used.
-struct Source {
-  text : String
-  origin : String
-}
+/// Where a schema argument came from. Parsing records the intent; reading the
+/// file happens afterwards, which is what keeps `parse_options` a pure
+/// function and therefore testable.
+pub(all) enum SourceKind {
+  Inline
+  File
+} derive(Eq, Debug)
 
 ///|
-struct Options {
+/// A schema argument together with where it came from, so that every
+/// diagnostic can name the file or the flag the operator actually used.
+pub(all) struct Source {
+  kind : SourceKind
+  value : String
+  origin : String
+} derive(Eq, Debug)
+
+///|
+pub(all) struct Options {
   mut before : Source?
   mut after : Source?
   mut hints : Source?
@@ -145,20 +167,23 @@ fn Options::new() -> Options {
 }
 
 ///|
-fn Options::assign(
-  self : Options,
-  slot : String,
-  value : Source,
-  command : String,
-) -> Unit {
-  let existing = match slot {
+fn Options::slot(self : Options, slot : String) -> Source? {
+  match slot {
     "before" => self.before
     "after" => self.after
     _ => self.hints
   }
-  if existing is Some(previous) {
-    fail_cli(
-      "the \{slot} schema was given twice: \{previous.origin} and \{value.origin}\n\{command}",
+}
+
+///|
+fn Options::assign(
+  self : Options,
+  slot : String,
+  value : Source,
+) -> Result[Unit, String] {
+  if self.slot(slot) is Some(previous) {
+    return Err(
+      "the \{slot} schema was given twice: \{previous.origin} and \{value.origin}",
     )
   }
   match slot {
@@ -166,20 +191,24 @@ fn Options::assign(
     "after" => self.after = Some(value)
     _ => self.hints = Some(value)
   }
+  Ok(())
 }
 
 ///|
-/// Read the value that follows a flag, failing with the flag's own name rather
-/// than a generic index error when it is missing.
-fn flag_value(args : Array[String], index : Int) -> String {
+/// Read the value that follows a flag, naming the flag rather than reporting a
+/// generic index error when it is missing.
+fn flag_value(args : Array[String], index : Int) -> Result[String, String] {
   if index >= args.length() {
-    fail_cli("\{args[index - 1]} requires a value\n\{usage()}")
+    return Err("\{args[index - 1]} requires a value")
   }
-  args[index]
+  Ok(args[index])
 }
 
 ///|
-fn parse_options(args : Array[String]) -> Options {
+/// Turn the argument list into options, or into the diagnostic that explains
+/// why it could not be. This performs no I/O and exits no process, so every
+/// branch below is reachable from a test.
+fn parse_options(args : Array[String]) -> Result[Options, String] {
   let options = Options::new()
   let positional = ["before", "after", "hints"]
   let mut next_positional = 0
@@ -188,19 +217,39 @@ fn parse_options(args : Array[String]) -> Options {
     let argument = args[i]
     match argument {
       "--before" | "--after" | "--hints" => {
-        let path = flag_value(args, i + 1)
+        let path = match flag_value(args, i + 1) {
+          Ok(value) => value
+          Err(message) => return Err(message)
+        }
         let slot = argument[2:].to_owned()
-        options.assign(slot, { text: read_file(path), origin: path, }, usage())
+        match options.assign(slot, { kind: File, value: path, origin: path, }) {
+          Err(message) => return Err(message)
+          Ok(_) => ()
+        }
         i = i + 2
       }
       "--before-json" | "--after-json" | "--hints-json" => {
-        let text = flag_value(args, i + 1)
+        let text = match flag_value(args, i + 1) {
+          Ok(value) => value
+          Err(message) => return Err(message)
+        }
         let slot = argument[2:argument.length() - 5].to_owned()
-        options.assign(slot, { text, origin: argument, }, usage())
+        match
+          options.assign(slot, { kind: Inline, value: text, origin: argument, }) {
+          Err(message) => return Err(message)
+          Ok(_) => ()
+        }
         i = i + 2
       }
       "--max-risk" => {
-        options.max_risk = parse_max_risk(flag_value(args, i + 1))
+        let value = match flag_value(args, i + 1) {
+          Ok(value) => value
+          Err(message) => return Err(message)
+        }
+        match @lib.Risk::parse(value) {
+          Some(risk) => options.max_risk = risk
+          None => return Err("unsupported risk level: \{value}")
+        }
         i = i + 2
       }
       "--allow-destructive" => {
@@ -208,49 +257,72 @@ fn parse_options(args : Array[String]) -> Options {
         i = i + 1
       }
       "--format" => {
-        options.format = Some(flag_value(args, i + 1))
+        match flag_value(args, i + 1) {
+          Ok(value) => options.format = Some(value)
+          Err(message) => return Err(message)
+        }
         i = i + 2
       }
       "--out" => {
-        options.out = Some(flag_value(args, i + 1))
+        match flag_value(args, i + 1) {
+          Ok(value) => options.out = Some(value)
+          Err(message) => return Err(message)
+        }
         i = i + 2
       }
       value => {
         if value.has_prefix("--") {
-          fail_cli("unknown option: \{value}\n\{usage()}")
+          return Err("unknown option: \{value}")
         }
         if next_positional >= positional.length() {
-          fail_cli("unexpected argument: \{value}\n\{usage()}")
+          return Err("unexpected argument: \{value}")
         }
         let slot = positional[next_positional]
         next_positional = next_positional + 1
-        options.assign(
-          slot,
-          { text: value, origin: "<\{slot} argument>", },
-          usage(),
-        )
+        match
+          options.assign(slot, {
+            kind: Inline,
+            value,
+            origin: "<\{slot} argument>",
+          }) {
+          Err(message) => return Err(message)
+          Ok(_) => ()
+        }
         i = i + 1
       }
     }
   }
-  options
+  Ok(options)
+}
+
+///|
+/// Resolve a recorded argument into schema text, reading the file if that is
+/// what the operator asked for.
+fn resolve(source : Source) -> String {
+  match source.kind {
+    Inline => source.value
+    File => read_file(source.value)
+  }
 }
 
 ///|
 fn build_plan_from(args : Array[String]) -> (@lib.Plan, Options) {
   guard args.length() >= 3 else { fail_cli(usage()) }
   let dialect = parse_dialect(args[2])
-  let options = parse_options(args)
+  let options = match parse_options(args) {
+    Ok(options) => options
+    Err(message) => fail_cli(message)
+  }
   let before = match options.before {
-    Some(source) => parse_schema(source.text, source.origin)
-    None => fail_cli("the source schema is required; use --before\n\{usage()}")
+    Some(source) => parse_schema(resolve(source), source.origin)
+    None => fail_cli("the source schema is required; use --before")
   }
   let after = match options.after {
-    Some(source) => parse_schema(source.text, source.origin)
-    None => fail_cli("the target schema is required; use --after\n\{usage()}")
+    Some(source) => parse_schema(resolve(source), source.origin)
+    None => fail_cli("the target schema is required; use --after")
   }
   let hints = match options.hints {
-    Some(source) => parse_hints(source.text, source.origin)
+    Some(source) => parse_hints(resolve(source), source.origin)
     None => @lib.RenameHints::empty()
   }
   match @lib.build_plan(before, after, dialect, hints~) {
@@ -264,9 +336,9 @@ fn build_plan_from(args : Array[String]) -> (@lib.Plan, Options) {
 /// offending steps is the whole point: an operator must see why CI failed.
 fn[T] reject_policy(plan : @lib.Plan, max_risk : @lib.Risk) -> T {
   let violations = plan.steps_above(max_risk)
-  println("migration policy violated: --max-risk is \{max_risk.label()}")
+  diagnostic("migration policy violated: --max-risk is \{max_risk.label()}")
   for step in violations {
-    println(
+    diagnostic(
       "  \{step.id} [\{step.risk.label()}] \{step.change.describe()}: \{step.reason}",
     )
   }
@@ -288,7 +360,7 @@ fn run_plan(args : Array[String]) -> Unit {
     "sql" => rendered.sql.join("\n")
     "json" => @lib.rendered_plan_to_json(rendered).stringify(indent=2)
     "markdown" => rendered.to_markdown()
-    other => fail_cli("unsupported plan format: \{other}\n\{usage()}")
+    other => fail_cli("unsupported plan format: \{other}")
   }
   write_output(output, options.out)
 }
@@ -317,7 +389,7 @@ fn run_verify(args : Array[String]) -> Unit {
     "text" => verify_text(plan, options.max_risk)
     "json" => @lib.plan_to_json(plan).stringify(indent=2)
     "markdown" => plan.to_markdown()
-    other => fail_cli("unsupported verify format: \{other}\n\{usage()}")
+    other => fail_cli("unsupported verify format: \{other}")
   }
   write_output(output, options.out)
   if !plan.steps_above(options.max_risk).is_empty() {
@@ -417,6 +489,7 @@ fn main {
     "verify" => run_verify(args)
     "demo" => println(demo())
     "help" | "--help" | "-h" => println(usage())
-    command => fail_cli("unknown command: \{command}\n\{usage()}")
+    "version" | "--version" | "-V" => println("moon-schema-plan \{VERSION}")
+    command => fail_cli("unknown command: \{command}")
   }
 }

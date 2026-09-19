@@ -120,3 +120,27 @@ jobs:
             --after examples/schema_v2.json \
             --hints examples/rename_hints.json \
             --allow-destructive --format markdown >> "$GITHUB_STEP_SUMMARY"
+
+  windows:
+    name: Test on Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MoonBit
+        shell: powershell
+        run: |
+          Invoke-RestMethod https://cli.moonbitlang.com/install/powershell.ps1 | Invoke-Expression
+          Add-Content -Path $env:GITHUB_PATH -Value "$env:USERPROFILE\.moon\bin"
+
+      - name: Update the package registry index
+        run: moon update
+
+      - name: Run the test suite
+        run: moon test --deny-warn
+
+      # The scripts are POSIX sh and have only ever been exercised on Linux and
+      # in Git Bash. windows-latest ships Git Bash, so the claim is checked.
+      - name: Exercise every documented CLI invocation
+        shell: bash
+        run: sh scripts/cli_smoke.sh

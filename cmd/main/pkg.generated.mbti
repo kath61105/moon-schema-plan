@@ -1,14 +1,35 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "kath61105/moon_schema_plan/cmd/main"
 
+import {
+  "kath61105/moon_schema_plan",
+  "moonbitlang/core/debug",
+}
+
 // Values
 
 // Errors
 
 // Types and methods
-type Options
+pub(all) struct Options {
+  mut before : Source?
+  mut after : Source?
+  mut hints : Source?
+  mut max_risk : @moon_schema_plan.Risk
+  mut format : String?
+  mut out : String?
+}
 
-type Source
+pub(all) struct Source {
+  kind : SourceKind
+  value : String
+  origin : String
+} derive(Eq, @debug.Debug)
+
+pub(all) enum SourceKind {
+  Inline
+  File
+} derive(Eq, @debug.Debug)
 
 // Type aliases
 
