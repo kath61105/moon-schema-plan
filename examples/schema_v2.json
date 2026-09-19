@@ -1,0 +1,40 @@
+{
+  "version": "2",
+  "tables": [
+    {
+      "name": "users",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "INTEGER",
+          "nullable": false,
+          "primary_key": true,
+          "unique": false
+        },
+        {
+          "name": "name",
+          "data_type": "TEXT",
+          "nullable": false,
+          "default_value": "'anonymous'",
+          "primary_key": false,
+          "unique": false
+        },
+        {
+          "name": "email",
+          "data_type": "TEXT",
+          "nullable": true,
+          "primary_key": false,
+          "unique": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "users_name_idx",
+          "columns": ["name"],
+          "unique": false
+        }
+      ],
+      "foreign_keys": []
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+import {
+  "local/moon_schema_plan" @lib,
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+pkgtype(kind: "executable")

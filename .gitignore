@@ -1,0 +1,15 @@
+# MoonBit build output
+_build/
+target/
+.mooncakes/
+
+# Editor and OS noise
+.DS_Store
+__MACOSX/
+*.swp
+.idea/
+.vscode/
+
+# Local scratch
+*.db
+uncovered.log

@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "tables": [
+    {
+      "name": "accounts",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "INTEGER",
+          "nullable": false,
+          "primary_key": true,
+          "unique": false
+        },
+        {
+          "name": "display_name",
+          "data_type": "TEXT",
+          "nullable": true,
+          "primary_key": false,
+          "unique": false
+        },
+        {
+          "name": "legacy_code",
+          "data_type": "TEXT",
+          "nullable": true,
+          "primary_key": false,
+          "unique": false
+        }
+      ],
+      "indexes": [],
+      "foreign_keys": []
+    }
+  ]
+}

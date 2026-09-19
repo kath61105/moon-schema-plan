@@ -1,0 +1,4 @@
+{
+  "tables": [["accounts", "users"]],
+  "columns": [["users", "display_name", "name"]]
+}

@@ -1,0 +1,127 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "local/moon_schema_plan"
+
+import {
+  "moonbitlang/core/debug",
+  "moonbitlang/core/json",
+}
+
+// Values
+pub fn build_plan(Schema, Schema, Dialect, hints? : RenameHints) -> Result[Plan, Array[ValidationIssue]]
+
+pub fn plan_to_json(Plan) -> Json
+
+pub fn render_plan(Plan, allow_destructive? : Bool) -> Result[RenderedPlan, Array[RenderIssue]]
+
+pub fn rendered_plan_to_json(RenderedPlan) -> Json
+
+pub fn schema_from_json(Json) -> Schema raise @json.JsonDecodeError
+
+pub fn schema_to_json(Schema) -> Json
+
+pub fn validate_schema(Schema) -> Array[ValidationIssue]
+
+// Errors
+
+// Types and methods
+pub(all) enum Change {
+  AddTable(Table)
+  DropTable(Table)
+  RenameTable(String, String)
+  AddColumn(String, Column)
+  DropColumn(String, Column)
+  RenameColumn(String, String, String)
+  AlterColumn(String, Column, Column)
+  AddIndex(String, Index)
+  DropIndex(String, Index)
+  AddForeignKey(String, ForeignKey)
+  DropForeignKey(String, ForeignKey)
+  RebuildTable(Table, Table, Array[(String, String)])
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct Column {
+  name : String
+  data_type : String
+  nullable : Bool
+  default_value : String?
+  primary_key : Bool
+  unique : Bool
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) enum Dialect {
+  SQLite
+  PostgreSQL
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct ForeignKey {
+  name : String
+  columns : Array[String]
+  referenced_table : String
+  referenced_columns : Array[String]
+  on_delete : String?
+  on_update : String?
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct Index {
+  name : String
+  columns : Array[String]
+  unique : Bool
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct MigrationStep {
+  id : String
+  risk : Risk
+  reason : String
+  change : Change
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct Plan {
+  from_version : String
+  to_version : String
+  dialect : Dialect
+  steps : Array[MigrationStep]
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn Plan::has_destructive_changes(Self) -> Bool
+
+pub(all) struct RenameHints {
+  tables : Array[(String, String)]
+  columns : Array[(String, String, String)]
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+pub fn RenameHints::empty() -> Self
+
+pub(all) struct RenderIssue {
+  step_id : String
+  message : String
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct RenderedPlan {
+  plan : Plan
+  sql : Array[String]
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) enum Risk {
+  Safe
+  Review
+  Destructive
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct Schema {
+  version : String
+  tables : Array[Table]
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct Table {
+  name : String
+  columns : Array[Column]
+  indexes : Array[Index]
+  foreign_keys : Array[ForeignKey]
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+pub(all) struct ValidationIssue {
+  path : String
+  message : String
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+
+// Type aliases
+
+// Traits
