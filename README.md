@@ -173,6 +173,39 @@ docker build -t moon-schema-plan-dev -f .devcontainer/Dockerfile .
 docker run --rm -v "$PWD:/workspace" moon-schema-plan-dev moon test --deny-warn
 ```
 
+## Work completed in this period
+
+This project was built for the 2026 MoonBit September Hackathon. Recording the
+boundary explicitly, because the rules ask entrants to distinguish new work from
+pre-existing work:
+
+The repository's first commit, `chore: import initial moon_schema_plan
+implementation`, captures the code as it stood before version control was set up
+on 19 September 2026 — the schema IR, validation, the diff engine, risk
+classification, the SQLite and PostgreSQL renderers, a demo CLI, and 23 tests,
+totalling 1,970 lines of MoonBit. Nothing was ever published from that state:
+there was no repository, no CI, no release and no registry entry.
+
+Every one of the 12 commits after it was written during this period, changing 23
+files by +2,579/-267 lines. That work is:
+
+- the risk-policy layer (`Risk::severity`/`parse`, `Plan::summary`,
+  `Plan::max_risk`, `Plan::steps_above`) and the Markdown reporting layer
+  (`Change::describe`, `Plan::to_markdown`, `RenderedPlan::to_markdown`) — a new
+  `report.mbt`;
+- the CLI rewrite: file inputs, the `verify` command, `--max-risk`, `--format`,
+  `--out`, and distinct exit codes for a policy violation and a real error;
+- the test suite going from 23 to 75 tests and library coverage to 607/613
+  lines, in two new files, plus removal of one branch that proved to be dead;
+- `scripts/cli_smoke.sh`, asserting all 21 documented CLI invocations, and a
+  rewritten `scripts/sqlite_e2e.sh` that migrates the example schemas against a
+  real database;
+- GitHub Actions across four backends, a dev container, this README,
+  `docs/schema-format.md`, and the 0.2.0 release to GitHub and mooncakes.
+
+The CI history is part of that record: the first run failed because a fresh
+runner has no MoonBit registry index, which local development had masked.
+
 ## Documentation
 
 - [Schema, hints and report JSON](docs/schema-format.md)
