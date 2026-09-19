@@ -27,6 +27,17 @@ All notable changes to this project are recorded here. The format follows
 
 ### Fixed
 
+- A SQLite rebuild committed over a broken foreign key. `PRAGMA
+  foreign_key_check` only reports violations, so the plan ended a rebuild by
+  printing them and committing anyway, while the documentation claimed a broken
+  reference was caught before the commit. The rebuild now feeds that count
+  through a `CHECK` constraint, which raises a real error. SQL cannot make a
+  `COMMIT` conditional on a query result, so the rollback comes from the client:
+  the migration must be applied with `sqlite3 -bail`, or any driver that stops
+  at the first error. The documentation says so now, and the end-to-end script
+  asserts both directions against a database seeded with a deliberate orphan.
+- The reserved table prefix widened from `__msp_new_` to `__msp_`, which also
+  covers the guard table above.
 - Adding a primary-key column to a table that already had one rendered
   `ALTER TABLE ... ADD COLUMN ... PRIMARY KEY`, which PostgreSQL refuses as
   more than one primary key per table, and the plan called it `review`.

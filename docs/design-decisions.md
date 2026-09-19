@@ -100,9 +100,15 @@ Several details of `sqlite_rebuild_sql` are deliberate:
   the new table exists and the copy is partly done.
 - **`foreign_keys=OFF` around the whole sequence**, which is SQLite's
   recommended order — dropping and renaming the table would otherwise cascade or
-  be rejected. The guarantee is restored by running **`foreign_key_check` inside
-  the transaction, before `COMMIT`**: if a reference broke, it is caught before
-  anything is committed.
+  be rejected. The guarantee is restored before `COMMIT`, but not by the pragma
+  alone: `PRAGMA foreign_key_check` only *reports* violations, and a script that
+  ignores its output commits over them regardless. The plan therefore feeds its
+  count through a `CHECK` constraint, which turns the report into a real error.
+  SQL cannot make a `COMMIT` conditional on a query result, so the rollback
+  comes from the client: **the migration must be applied with `sqlite3 -bail`,
+  or any driver that stops at the first error**, which leaves the transaction
+  open and rolls it back on exit. `scripts/sqlite_e2e.sh` asserts both
+  directions against a database seeded with a deliberate orphan.
 - **`__msp_new_` is a reserved prefix.** `validate_schema` rejects any user table
   whose name starts with it, so staging can never collide with a real table.
 - **Backfill is explicit or the plan fails.** When a nullable column becomes

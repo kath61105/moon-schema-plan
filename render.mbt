@@ -165,7 +165,20 @@ fn sqlite_rebuild_sql(
   for index in after.indexes {
     statements.push(create_index_sql(after.name, index))
   }
-  statements.push("PRAGMA foreign_key_check;")
+  // `PRAGMA foreign_key_check` only reports violations, so on its own the
+  // commit proceeds over a broken reference. Feeding its count through a CHECK
+  // constraint turns that report into a real error. A client that stops at the
+  // first error then leaves the transaction open, and rolling back an open
+  // transaction on exit is what undoes the rebuild -- so the migration must be
+  // applied with `sqlite3 -bail`, or any driver that aborts on error. SQL alone
+  // cannot make a COMMIT conditional on a query result.
+  statements.push(
+    "CREATE TEMP TABLE \"__msp_fk_guard\" (violations INTEGER, CHECK (violations = 0));",
+  )
+  statements.push(
+    "INSERT INTO \"__msp_fk_guard\" SELECT count(*) FROM pragma_foreign_key_check;",
+  )
+  statements.push("DROP TABLE \"__msp_fk_guard\";")
   statements.push("COMMIT;")
   statements.push("PRAGMA foreign_keys=ON;")
   statements

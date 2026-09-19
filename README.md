@@ -96,6 +96,18 @@ moon run cmd/main -- plan postgresql \
   --allow-destructive
 ```
 
+Apply a SQLite migration with a client that stops at the first error:
+
+```sh
+moon run cmd/main -- plan sqlite --before v1.json --after v2.json   --allow-destructive --out migration.sql
+sqlite3 -bail app.db < migration.sql
+```
+
+A rebuild checks referential integrity before committing, but SQL cannot make a
+`COMMIT` conditional on a query result: the check raises an error, and it is the
+client stopping on that error that leaves the transaction to be rolled back.
+Without `-bail`, the error is reported and the migration commits anyway.
+
 `--format` selects `sql` (default), `json` for a stable machine-readable report,
 or `markdown` for review. `--out <path>` writes to a file. Schemas may also be
 passed inline with `--before-json` and `--after-json`.

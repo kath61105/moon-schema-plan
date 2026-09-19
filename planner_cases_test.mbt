@@ -337,7 +337,7 @@ test "SQLite rebuilds a table when a foreign key changes" {
   ])
   let sql = sql_for(planned(before, after, @moon_schema_plan.SQLite))
   assert_true(sql.contains("__msp_new_child"))
-  assert_true(sql.contains("PRAGMA foreign_key_check;"))
+  assert_true(sql.contains("FROM pragma_foreign_key_check;"))
 }
 
 ///|

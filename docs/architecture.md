@@ -46,8 +46,11 @@ constraint name such a statement would need.
 
 SQLite operations that cannot be expressed safely as direct alterations become
 one auditable rebuild: create a temporary target table, copy mapped columns,
-replace the old table, recreate indexes, and run `foreign_key_check`, all inside
-a transaction. Nullable values moving into a required column are backfilled with
+replace the old table, recreate indexes, and check referential integrity, all
+inside a transaction. That last check is a `CHECK` constraint fed by
+`PRAGMA foreign_key_check`, because the pragma alone only reports; the
+migration must be applied by a client that stops at the first error, such as
+`sqlite3 -bail`, for the rollback to happen. Nullable values moving into a required column are backfilled with
 the explicit target default; no default means planning fails rather than
 silently dropping rows. Table names beginning with `__msp_new_` are reserved for
 collision-free rebuild staging and are rejected in user schemas.

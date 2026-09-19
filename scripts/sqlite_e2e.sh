@@ -38,7 +38,7 @@ sqlite3 "$demo_db" \
   "CREATE TABLE users (id INTEGER PRIMARY KEY NOT NULL, nickname TEXT);
    INSERT INTO users(id, nickname) VALUES (1, 'Ada'), (2, NULL);"
 
-moon run cmd/main -- demo | sqlite3 "$demo_db"
+moon run cmd/main -- demo | sqlite3 -bail "$demo_db"
 
 demo_actual="$(sqlite3 "$demo_db" \
   "SELECT id || ':' || display_name FROM users ORDER BY id;
@@ -66,7 +66,7 @@ moon run cmd/main -- plan sqlite \
   --before examples/schema_v1.json \
   --after examples/schema_v2.json \
   --hints examples/rename_hints.json \
-  --allow-destructive | sqlite3 "$example_db"
+  --allow-destructive | sqlite3 -bail "$example_db"
 
 example_actual="$(sqlite3 "$example_db" \
   "SELECT id || ':' || name FROM users ORDER BY id;
@@ -124,7 +124,7 @@ moon run cmd/main -- plan sqlite \
   --before-json '{"version":"1","tables":[]}' \
   --after-json "$composite_schema" > "$work_dir/composite.sql"
 
-sqlite3 "$composite_db" < "$work_dir/composite.sql" 2>"$work_dir/composite.err" || true
+sqlite3 -bail "$composite_db" < "$work_dir/composite.sql" 2>"$work_dir/composite.err" || true
 
 if [ -s "$work_dir/composite.err" ]; then
   printf 'FAIL composite primary key was rejected: %s\n' \
@@ -149,6 +149,75 @@ sqlite3 "$composite_db" \
   >/dev/null 2>&1 || duplicate_rejected=1
 
 check 'composite primary key rejects a duplicate pair' '1' "$duplicate_rejected"
+
+# Case 5: a rebuild must not commit over a broken reference.
+#
+# PRAGMA foreign_key_check only reports violations, so the plan feeds its count
+# through a CHECK constraint to turn that report into a real error. SQL cannot
+# make a COMMIT conditional on a query result, so the rollback comes from the
+# client stopping at the first error and leaving the transaction open. Both
+# directions are asserted here, and the apply uses -bail exactly as the README
+# tells operators to.
+guard_before='{"version":"1","tables":[
+{"name":"p","columns":[
+  {"name":"id","data_type":"INTEGER","nullable":false,"primary_key":true,"unique":false},
+  {"name":"v","data_type":"TEXT","nullable":true,"primary_key":false,"unique":false}],
+ "indexes":[],"foreign_keys":[],"checks":[]},
+{"name":"c","columns":[
+  {"name":"id","data_type":"INTEGER","nullable":false,"primary_key":true,"unique":false},
+  {"name":"pid","data_type":"INTEGER","nullable":true,"primary_key":false,"unique":false}],
+ "indexes":[],"checks":[],
+ "foreign_keys":[{"name":"c_p_fk","columns":["pid"],"referenced_table":"p",
+                  "referenced_columns":["id"]}]}]}'
+guard_after="$(printf '%s' "$guard_before"   | sed 's/"v","data_type":"TEXT"/"v","data_type":"INTEGER"/; s/"version":"1"/"version":"2"/')"
+
+moon run cmd/main -- plan sqlite --before-json "$guard_before"   --after-json "$guard_after" --allow-destructive > "$work_dir/guard.sql"
+
+# seed <database> <orphan yes|no>
+seed_guard_db() {
+  rm -f "$1"
+  sqlite3 "$1"     "CREATE TABLE p (id INTEGER PRIMARY KEY NOT NULL, v TEXT);
+     CREATE TABLE c (id INTEGER PRIMARY KEY NOT NULL,
+                     pid INTEGER REFERENCES p(id));
+     INSERT INTO p VALUES (1, 'kept');
+     INSERT INTO c VALUES (1, 1);"
+  if [ "$2" = "yes" ]; then
+    sqlite3 "$1" "PRAGMA foreign_keys=OFF; INSERT INTO c VALUES (2, 99);"
+  fi
+}
+
+broken_db="$work_dir/broken.db"
+seed_guard_db "$broken_db" yes
+set +e
+sqlite3 -bail "$broken_db" < "$work_dir/guard.sql" >/dev/null 2>&1
+broken_status=$?
+set -e
+
+if [ "$broken_status" = "0" ]; then
+  printf 'FAIL the rebuild committed over a broken reference
+' >&2
+  failures=$((failures + 1))
+else
+  printf 'ok   a broken reference fails the rebuild (exit %s)
+' "$broken_status"
+fi
+
+broken_type="$(sqlite3 "$broken_db"   "SELECT type FROM pragma_table_info('p') WHERE name = 'v';" | normalise)"
+check 'the failed rebuild was rolled back, not partly applied' 'TEXT' "$broken_type"
+
+broken_staging="$(sqlite3 "$broken_db"   "SELECT count(*) FROM sqlite_master WHERE name LIKE '__msp_%';" | normalise)"
+check 'the failed rebuild left no staging or guard table' '0' "$broken_staging"
+
+intact_db="$work_dir/intact.db"
+seed_guard_db "$intact_db" no
+sqlite3 -bail "$intact_db" < "$work_dir/guard.sql" >/dev/null
+
+intact_type="$(sqlite3 "$intact_db"   "SELECT type FROM pragma_table_info('p') WHERE name = 'v';" | normalise)"
+check 'a sound database still migrates' 'INTEGER' "$intact_type"
+
+intact_staging="$(sqlite3 "$intact_db"   "SELECT count(*) FROM sqlite_master WHERE name LIKE '__msp_%';" | normalise)"
+check 'the successful rebuild left no staging or guard table' '0' "$intact_staging"
+
 
 if [ "$failures" != "0" ]; then
   printf '\n%s SQLite end-to-end assertions failed\n' "$failures" >&2

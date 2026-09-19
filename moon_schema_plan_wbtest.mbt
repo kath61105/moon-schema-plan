@@ -599,7 +599,7 @@ test "SQLite uses a transactional rebuild for incompatible alteration" {
             }),
           )
           assert_true(
-            rendered.sql.any(sql => sql == "PRAGMA foreign_key_check;"),
+            rendered.sql.any(sql => sql.contains("pragma_foreign_key_check")),
           )
         }
       }

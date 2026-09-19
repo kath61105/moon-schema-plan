@@ -156,10 +156,10 @@ pub fn validate_schema(schema : Schema) -> Array[ValidationIssue] {
   issues.push_iter(duplicate_index_names(schema).iter())
   for table in schema.tables {
     let base = "tables.\{table.name}"
-    if table.name.has_prefix("__msp_new_") {
+    if table.name.has_prefix("__msp_") {
       issues.push({
         path: "\{base}.name",
-        message: "table name uses the reserved SQLite rebuild prefix: __msp_new_",
+        message: "table name uses the reserved SQLite rebuild prefix: __msp_",
       })
     }
     if table.columns.is_empty() {
