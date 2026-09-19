@@ -18,6 +18,11 @@ jobs:
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
+      # A fresh runner has no registry index, so resolving moonbitlang/x
+      # (used by the executable package) fails until the index is fetched.
+      - name: Update the package registry index
+        run: moon update
+
       - name: Report toolchain version
         run: moon version --all
 
@@ -47,6 +52,11 @@ jobs:
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
+      # A fresh runner has no registry index, so resolving moonbitlang/x
+      # (used by the executable package) fails until the index is fetched.
+      - name: Update the package registry index
+        run: moon update
+
       - name: Build every package
         run: moon build --target ${{ matrix.target }}
 
@@ -63,6 +73,11 @@ jobs:
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      # A fresh runner has no registry index, so resolving moonbitlang/x
+      # (used by the executable package) fails until the index is fetched.
+      - name: Update the package registry index
+        run: moon update
 
       - name: Install sqlite3
         run: |
