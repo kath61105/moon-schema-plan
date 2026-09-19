@@ -75,6 +75,14 @@ by `scripts/cli_smoke.sh`, which asserts observable behaviour — exit status an
 output — rather than internals, and by `scripts/sqlite_e2e.sh`, which pipes the
 generated SQL into a real `sqlite3` database and checks that the rows survived.
 
+## Rationale
+
+This page describes what the planner does. The reasoning behind its three most
+opinionated choices — why a rename needs an explicit hint, why a policy
+violation has its own exit code, and why SQLite changes become one table
+rebuild — is in [design-decisions.md](design-decisions.md), together with the
+alternatives that were rejected and what each choice costs.
+
 ## Trust boundary
 
 Column types and default expressions remain dialect SQL fragments because a
