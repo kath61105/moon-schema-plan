@@ -1,5 +1,5 @@
 import {
-  "jamesrobin2026/moon_schema_plan" @lib,
+  "kath61105/moon_schema_plan" @lib,
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/x/fs",

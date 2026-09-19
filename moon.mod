@@ -9,13 +9,13 @@
 //   "moonbitlang/x@0.4.6",
 // }
 
-name = "jamesrobin2026/moon_schema_plan"
+name = "kath61105/moon_schema_plan"
 
 version = "0.1.0"
 
 readme = "README.md"
 
-repository = "https://github.com/jamesrobin2026/moon-schema-plan"
+repository = "https://github.com/kath61105/moon-schema-plan"
 
 license = "Apache-2.0"
 

@@ -37,11 +37,11 @@ These steps need the entrant's real identities and are deliberately not
 fabricated by the codebase.
 
 - ~~replace the placeholder module owner and repository URL~~ — done: the
-  module is `jamesrobin2026/moon_schema_plan` and the repository is
-  `https://github.com/jamesrobin2026/moon-schema-plan`
+  module is `kath61105/moon_schema_plan` and the repository is
+  `https://github.com/kath61105/moon-schema-plan`
 - create the public GitHub repository and push `main`
 - confirm GitHub Actions is enabled and the CI badge is green
-- register the `jamesrobin2026` account on <https://mooncakes.io> (it signs in
+- register the `kath61105` account on <https://mooncakes.io> (it signs in
   with GitHub), then `moon publish` and check the rendered documentation. A
   MoonBit module name is `<owner>/<module>`, and the owner must match a
   registered account, so this has to happen before the first publish
