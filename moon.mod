@@ -24,3 +24,7 @@ keywords = [ "database", "schema", "migration", "sqlite", "postgresql", "ci" ]
 preferred_target = "wasm"
 
 description = "Deterministic schema diff, migration planning, and destructive-change gates for MoonBit"
+
+import {
+  "moonbitlang/x@0.5.5",
+}

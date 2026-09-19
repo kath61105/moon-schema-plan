@@ -6,6 +6,9 @@ package "local/moon_schema_plan/cmd/main"
 // Errors
 
 // Types and methods
+type Options
+
+type Source
 
 // Type aliases
 
