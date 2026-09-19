@@ -194,8 +194,8 @@ classification, the SQLite and PostgreSQL renderers, a demo CLI, and 23 tests,
 totalling 1,970 lines of MoonBit. Nothing was ever published from that state:
 there was no repository, no CI, no release and no registry entry.
 
-Every one of the 12 commits after it was written during this period, changing 23
-files by +2,579/-267 lines. That work is:
+Every commit after it — 16 so far, changing 26 files by +3,095/-269 lines — was
+written during this period. That work is:
 
 - the risk-policy layer (`Risk::severity`/`parse`, `Plan::summary`,
   `Plan::max_risk`, `Plan::steps_above`) and the Markdown reporting layer
@@ -203,8 +203,8 @@ files by +2,579/-267 lines. That work is:
   `report.mbt`;
 - the CLI rewrite: file inputs, the `verify` command, `--max-risk`, `--format`,
   `--out`, and distinct exit codes for a policy violation and a real error;
-- the test suite going from 23 to 75 tests and library coverage to 607/613
-  lines, in two new files, plus removal of one branch that proved to be dead;
+- the test suite going from 23 to 79 tests and library coverage to 607/613
+  lines, in three new files, plus removal of one branch that proved to be dead;
 - `scripts/cli_smoke.sh`, asserting all 21 documented CLI invocations, and a
   rewritten `scripts/sqlite_e2e.sh` that migrates the example schemas against a
   real database;

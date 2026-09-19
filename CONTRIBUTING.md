@@ -23,5 +23,12 @@ sh scripts/sqlite_e2e.sh
 documents, so a change to the CLI must update the README and that script
 together. `scripts/sqlite_e2e.sh` needs the `sqlite3` binary on `PATH`.
 
+`scripts/project_stats.sh` recomputes the commit, diff, test and coverage
+figures that `README.md` and `docs/proposal.zh-CN.md` quote. Run it if you
+change any of them.
+
+`docs/design-decisions.md` and `docs/design-decisions.zh-CN.md` are the same
+document in two languages. Change both, or neither.
+
 Commit messages should describe one meaningful engineering change. Do not split
 work into empty or mechanical commits merely to increase the count.

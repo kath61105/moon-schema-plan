@@ -34,6 +34,13 @@ Markdown 评审报告、SQLite 与 PostgreSQL SQL renderer、可在 CI 中使用
 MySQL 支持。类型和 default expression 是受限的方言片段，来自可信配置；本项目不是 SQL
 防火墙。这个边界让纯规划核心可在 Wasm、Wasm-GC、JavaScript 和 Native 后端编译。
 
+IR 建模的范围是表、列、索引和外键；**不**建模 CHECK 约束、生成列、部分索引谓词、触发器
+和视图。这条边界决定了两个对外可见的行为：SQLite 删列一律走表重建，而不用 3.35 起提供的
+原生 `DROP COLUMN`——该语句失败的八种条件里有四种涉及 IR 看不见的对象，仅凭看得见的四种
+放行会发出可能执行失败的 SQL；以及重建只恢复索引，不恢复触发器和视图，这一点由每个重建
+步骤在自己的 reason 里写明。两者的完整论证见
+[design-decisions.zh-CN.md](design-decisions.zh-CN.md)。
+
 ## 实现路径与验收
 
 实现采用 `Schema -> validate -> deterministic diff -> risk gate -> dialect renderer`
@@ -47,8 +54,9 @@ nullable 改为 required 时，只有目标 schema 给出 default 才允许规�
 
 验收以 `moon check --deny-warn`、`moon fmt --check`、`moon info` 无漂移、四后端编译与
 测试、命令行全部文档化用法与退出码的断言脚本，以及真实 sqlite3 数据迁移为准；
-库代码行覆盖率 607/613，其余为已在源码中注明的不可达防御分支。项目为原创实现，
-不移植第三方代码，采用 Apache-2.0。
+79 个测试在 wasm、wasm-gc、JavaScript、Native 四个后端上全部通过，库代码行覆盖率
+607/613，其余为已在源码中注明的不可达防御分支。项目为原创实现，不移植第三方代码，
+采用 Apache-2.0。
 
 ## 关键设计取舍
 

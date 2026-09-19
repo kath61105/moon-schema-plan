@@ -49,6 +49,10 @@ fabricated by the codebase.
   the owner must match a registered account, which is why registration comes
   first
 - ~~tag a release~~ — done: `v0.2.0`
+- run `sh scripts/project_stats.sh` and refresh the figures quoted in
+  `README.md` ("Work completed in this period") and `docs/proposal.zh-CN.md`.
+  Both cite a commit count, a diff size, a test count and a coverage ratio, and
+  all four move as work continues
 - register on the event's Feishu form with the repository URL, and join the
   official participant group — the rules state that entrants who are not in the
   group may not receive prize money
