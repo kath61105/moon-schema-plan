@@ -114,6 +114,8 @@ pub fn Change::describe(self : Change) -> String {
       "add foreign key \{foreign_key.name} on \{table}"
     DropForeignKey(table, foreign_key) =>
       "drop foreign key \{foreign_key.name} on \{table}"
+    AddCheck(table, check) => "add check \{check.name} on \{table}"
+    DropCheck(table, check) => "drop check \{check.name} on \{table}"
     RebuildTable(_, after, _) => "rebuild table \{after.name}"
   }
 }

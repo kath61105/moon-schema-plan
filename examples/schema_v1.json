@@ -27,7 +27,8 @@
         }
       ],
       "indexes": [],
-      "foreign_keys": []
+      "foreign_keys": [],
+      "checks": []
     }
   ]
 }

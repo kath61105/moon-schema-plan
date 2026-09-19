@@ -44,12 +44,56 @@ pub(all) struct ForeignKey {
 } derive(Eq, Debug, ToJson, FromJson)
 
 ///|
+/// A table-level `CHECK` constraint. The expression is a dialect SQL fragment
+/// held under the same rules as a column default: validated for statement
+/// delimiters, emitted verbatim, never parsed.
+pub(all) struct CheckConstraint {
+  name : String
+  expression : String
+} derive(Eq, Debug, ToJson, FromJson)
+
+///|
 pub(all) struct Table {
   name : String
   columns : Array[Column]
   indexes : Array[Index]
   foreign_keys : Array[ForeignKey]
-} derive(Eq, Debug, ToJson, FromJson)
+  checks : Array[CheckConstraint]
+} derive(Eq, Debug, ToJson)
+
+///|
+fn[T : @json.FromJson] required_field(
+  fields : Map[String, Json],
+  key : String,
+  path : @json.JsonPath,
+) -> T raise @json.JsonDecodeError {
+  match fields.get(key) {
+    Some(value) => @json.from_json(value, path=path.add_key(key))
+    None => raise @json.JsonDecodeError((path, "Missing field \{key}"))
+  }
+}
+
+///|
+/// `checks` arrived after 0.2.0. A schema file written against that release
+/// omits it, and refusing to read those files on upgrade would break every
+/// stored schema over a field whose absence simply means "no check
+/// constraints". Decoding therefore treats it as optional; encoding always
+/// writes it, so a round trip normalises the document.
+pub impl @json.FromJson for Table with fn from_json(json, path) {
+  guard json is Object(fields) else {
+    raise @json.JsonDecodeError((path, "expected an object describing a table"))
+  }
+  {
+    name: required_field(fields, "name", path),
+    columns: required_field(fields, "columns", path),
+    indexes: required_field(fields, "indexes", path),
+    foreign_keys: required_field(fields, "foreign_keys", path),
+    checks: match fields.get("checks") {
+      Some(value) => @json.from_json(value, path=path.add_key("checks"))
+      None => []
+    },
+  }
+}
 
 ///|
 pub(all) struct Schema {
@@ -82,6 +126,8 @@ pub(all) enum Change {
   DropIndex(String, Index)
   AddForeignKey(String, ForeignKey)
   DropForeignKey(String, ForeignKey)
+  AddCheck(String, CheckConstraint)
+  DropCheck(String, CheckConstraint)
   RebuildTable(Table, Table, Array[(String, String)])
 } derive(Eq, Debug, ToJson, FromJson)
 

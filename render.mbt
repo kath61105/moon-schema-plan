@@ -49,6 +49,11 @@ fn foreign_key_definition(foreign_key : ForeignKey) -> String {
 }
 
 ///|
+fn check_definition(check : CheckConstraint) -> String {
+  "CONSTRAINT \{quote_identifier(check.name)} CHECK (\{check.expression})"
+}
+
+///|
 fn create_table_sql(table : Table, override_name? : String? = None) -> String {
   let key_columns = table.columns.filter(column => column.primary_key)
   let composite_key = key_columns.length() > 1
@@ -60,6 +65,7 @@ fn create_table_sql(table : Table, override_name? : String? = None) -> String {
     definitions.push("PRIMARY KEY (\{names.join(", ")})")
   }
   definitions.push_iter(table.foreign_keys.map(foreign_key_definition).iter())
+  definitions.push_iter(table.checks.map(check_definition).iter())
   let name = override_name.unwrap_or(table.name)
   let body = definitions.join(",\n  ")
   "CREATE TABLE \{quote_identifier(name)} (\n  \{body}\n);"
@@ -204,6 +210,19 @@ fn render_change(change : Change, dialect : Dialect) -> Array[String] {
     DropIndex(_, index) => ["DROP INDEX \{quote_identifier(index.name)};"]
     AddForeignKey(table, foreign_key) =>
       [add_foreign_key_sql(table, foreign_key)]
+    AddCheck(table, check) =>
+      ["ALTER TABLE \{quote_identifier(table)} ADD \{check_definition(check)};"]
+    DropCheck(table, check) =>
+      match dialect {
+        PostgreSQL =>
+          [
+            "ALTER TABLE \{quote_identifier(table)} DROP CONSTRAINT \{quote_identifier(check.name)};",
+          ]
+        SQLite =>
+          [
+            "-- internal error: SQLite check-constraint changes require a table rebuild",
+          ]
+      }
     DropForeignKey(table, foreign_key) =>
       match dialect {
         PostgreSQL =>

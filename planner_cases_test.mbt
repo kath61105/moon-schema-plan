@@ -9,8 +9,9 @@ fn tbl(
   columns : Array[@moon_schema_plan.Column],
   indexes? : Array[@moon_schema_plan.Index] = [],
   foreign_keys? : Array[@moon_schema_plan.ForeignKey] = [],
+  checks? : Array[@moon_schema_plan.CheckConstraint] = [],
 ) -> @moon_schema_plan.Table {
-  { name, columns, indexes, foreign_keys, }
+  { name, columns, indexes, foreign_keys, checks, }
 }
 
 ///|

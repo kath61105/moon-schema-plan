@@ -24,6 +24,7 @@ fn users_v1() -> @moon_schema_plan.Schema {
         ],
         indexes: [],
         foreign_keys: [],
+        checks: [],
       },
     ],
   }
@@ -45,6 +46,7 @@ fn users_v2() -> @moon_schema_plan.Schema {
           { name: "users_email_idx", columns: ["email"], unique: true, },
         ],
         foreign_keys: [],
+        checks: [],
       },
     ],
   }
@@ -195,6 +197,7 @@ test "markdown cells escape pipes in identifiers" {
         columns: [column("id", "INTEGER", nullable=false, primary_key=true)],
         indexes: [],
         foreign_keys: [],
+        checks: [],
       },
     ],
   }
@@ -216,12 +219,14 @@ test "every change variant has a distinct description" {
       columns: [],
       indexes: [],
       foreign_keys: [],
+      checks: [],
     }),
     @moon_schema_plan.Change::DropTable({
       name: "t",
       columns: [],
       indexes: [],
       foreign_keys: [],
+      checks: [],
     }),
     @moon_schema_plan.Change::RenameTable("t", "u"),
     @moon_schema_plan.Change::AddColumn("t", column("c", "TEXT")),
@@ -258,9 +263,11 @@ test "every change variant has a distinct description" {
       on_delete: None,
       on_update: None,
     }),
+    @moon_schema_plan.Change::AddCheck("t", { name: "c", expression: "v > 0", }),
+    @moon_schema_plan.Change::DropCheck("t", { name: "c", expression: "v > 0", }),
     @moon_schema_plan.Change::RebuildTable(
-      { name: "t", columns: [], indexes: [], foreign_keys: [], },
-      { name: "t", columns: [], indexes: [], foreign_keys: [], },
+      { name: "t", columns: [], indexes: [], foreign_keys: [], checks: [], },
+      { name: "t", columns: [], indexes: [], foreign_keys: [], checks: [], },
       [],
     ),
   ].map(change => change.describe())

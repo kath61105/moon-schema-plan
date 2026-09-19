@@ -97,6 +97,17 @@ pub fn validate_schema(schema : Schema) -> Array[ValidationIssue] {
         "\{base}.foreign_keys",
       ).iter(),
     )
+    issues.push_iter(
+      duplicate_names(table.checks.map(check => check.name), "\{base}.checks").iter(),
+    )
+    for check in table.checks {
+      if unsafe_sql_fragment(check.expression) {
+        issues.push({
+          path: "\{base}.checks.\{check.name}.expression",
+          message: "check expression must be non-empty and contain no SQL statement delimiter",
+        })
+      }
+    }
     for index in table.indexes {
       if index.columns.is_empty() {
         issues.push({

@@ -352,6 +352,7 @@ fn demo() -> String {
         ],
         indexes: [],
         foreign_keys: [],
+        checks: [],
       },
     ],
   }
@@ -386,6 +387,7 @@ fn demo() -> String {
           },
         ],
         foreign_keys: [],
+        checks: [],
       },
     ],
   }

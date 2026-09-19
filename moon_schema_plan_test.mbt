@@ -18,6 +18,7 @@ test "public API plans and renders a safe table creation" {
         ],
         indexes: [],
         foreign_keys: [],
+        checks: [],
       },
     ],
   }

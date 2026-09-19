@@ -36,9 +36,16 @@ pub(all) enum Change {
   DropIndex(String, Index)
   AddForeignKey(String, ForeignKey)
   DropForeignKey(String, ForeignKey)
+  AddCheck(String, CheckConstraint)
+  DropCheck(String, CheckConstraint)
   RebuildTable(Table, Table, Array[(String, String)])
 } derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 pub fn Change::describe(Self) -> String
+
+pub(all) struct CheckConstraint {
+  name : String
+  expression : String
+} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
 
 pub(all) struct Column {
   name : String
@@ -133,7 +140,9 @@ pub(all) struct Table {
   columns : Array[Column]
   indexes : Array[Index]
   foreign_keys : Array[ForeignKey]
-} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+  checks : Array[CheckConstraint]
+} derive(Eq, ToJson, @debug.Debug)
+pub impl @json.FromJson for Table
 
 pub(all) struct ValidationIssue {
   path : String

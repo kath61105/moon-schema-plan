@@ -34,7 +34,8 @@
           "unique": false
         }
       ],
-      "foreign_keys": []
+      "foreign_keys": [],
+      "checks": []
     }
   ]
 }

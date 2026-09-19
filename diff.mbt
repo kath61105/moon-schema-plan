@@ -22,6 +22,14 @@ fn find_foreign_key(
 }
 
 ///|
+fn find_check(
+  checks : Array[CheckConstraint],
+  name : String,
+) -> CheckConstraint? {
+  checks.iter().find_first(check => check.name == name)
+}
+
+///|
 fn renamed_table_target(hints : RenameHints, source : String) -> String? {
   for pair in hints.tables {
     if pair.0 == source {
@@ -82,6 +90,8 @@ fn change_sort_key(change : Change) -> String {
     DropColumn(table, column) => "42:\{table}:\{column.name}"
     AddIndex(table, index) => "50:\{table}:\{index.name}"
     AddForeignKey(table, foreign_key) => "51:\{table}:\{foreign_key.name}"
+    DropCheck(table, check) => "22:\{table}:\{check.name}"
+    AddCheck(table, check) => "52:\{table}:\{check.name}"
     RebuildTable(_, after, _) => "45:\{after.name}"
     DropTable(table) => "90:\{table.name}"
   }
@@ -101,6 +111,8 @@ fn change_phase(change : Change) -> Int {
     RebuildTable(_, _, _) => 45
     AddIndex(_, _) => 50
     AddForeignKey(_, _) => 51
+    DropCheck(_, _) => 22
+    AddCheck(_, _) => 52
     DropTable(_) => 90
   }
 }
@@ -207,6 +219,9 @@ fn risk_for(change : Change) -> (Risk, String) {
     AddForeignKey(_, _) =>
       (Review, "existing rows must satisfy the new referential constraint")
     DropForeignKey(_, _) => (Review, "removes referential protection")
+    AddCheck(_, _) =>
+      (Review, "existing rows must already satisfy the new check constraint")
+    DropCheck(_, _) => (Review, "removes a data-integrity constraint")
     RebuildTable(before, after, mappings) =>
       if before.columns.any(column => {
           !mappings.any(mapping => mapping.0 == column.name)
@@ -224,12 +239,12 @@ fn risk_for(change : Change) -> (Risk, String) {
         }) {
         (
           Destructive,
-          "SQLite table rebuild drops a column or converts stored values; check constraints, triggers and views the schema does not model are not carried over",
+          "SQLite table rebuild drops a column or converts stored values; triggers and views, which the schema does not model, are not carried over",
         )
       } else {
         (
           Review,
-          "SQLite requires an auditable table rebuild for this schema change; check constraints, triggers and views the schema does not model are not carried over",
+          "SQLite requires an auditable table rebuild for this schema change; triggers and views, which the schema does not model, are not carried over",
         )
       }
   }
@@ -389,7 +404,8 @@ fn diff_existing_table(
   let table_name = after.name
   if dialect == SQLite {
     let mappings : Array[(String, String)] = []
-    let mut rebuild = before.foreign_keys != after.foreign_keys
+    let mut rebuild = before.foreign_keys != after.foreign_keys ||
+      before.checks != after.checks
     for column in before.columns {
       let target_name = renamed_column_target(hints, table_name, column.name).unwrap_or(
         column.name,
@@ -429,6 +445,21 @@ fn diff_existing_table(
         changes.push(AddForeignKey(table_name, target))
       }
       _ => ()
+    }
+  }
+  for check in before.checks {
+    match find_check(after.checks, check.name) {
+      None => changes.push(DropCheck(table_name, check))
+      Some(target) if target != check => {
+        changes.push(DropCheck(table_name, check))
+        changes.push(AddCheck(table_name, target))
+      }
+      _ => ()
+    }
+  }
+  for check in after.checks {
+    if find_check(before.checks, check.name) is None {
+      changes.push(AddCheck(table_name, check))
     }
   }
   for index in before.indexes {

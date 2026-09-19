@@ -16,8 +16,9 @@ fn test_table(
   columns : Array[Column],
   indexes? : Array[Index] = [],
   foreign_keys? : Array[ForeignKey] = [],
+  checks? : Array[CheckConstraint] = [],
 ) -> Table {
-  { name, columns, indexes, foreign_keys, }
+  { name, columns, indexes, foreign_keys, checks, }
 }
 
 ///|
@@ -631,7 +632,8 @@ test "schema JSON representation round trips" {
       #|        }
       #|      ],
       #|      "indexes": [],
-      #|      "foreign_keys": []
+      #|      "foreign_keys": [],
+      #|      "checks": []
       #|    }
       #|  ]
       #|}
