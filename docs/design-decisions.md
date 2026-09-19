@@ -131,13 +131,15 @@ what this project's schema IR can actually see:
 | The column is indexed | Yes — `Table::indexes` |
 | The column is used in a foreign key | Yes — `Table::foreign_keys` |
 | The column is named in a partial index's `WHERE` clause | **No** — index predicates are not modelled |
-| The column is named in a `CHECK` constraint | **No** — check constraints are not modelled |
+| The column is named in a `CHECK` constraint | Yes, for constraints the schema declares — but not for any the real table also carries |
 | The column is used in a generated column's expression | **No** — generated columns are not modelled |
 | The column appears in a trigger or a view | **No** — neither is modelled |
 
-Four of the eight are invisible. A gate built on the other four would emit
-`DROP COLUMN` for a column that a trigger or a `CHECK` constraint still
-references, and that statement fails against the real database. For a planner
+Half of them are invisible, and the check-constraint row is only half visible:
+the IR knows the constraints the schema declares, not any the real table also
+carries. A gate built on what can be seen would emit `DROP COLUMN` for a column
+that a trigger, a view or an undeclared constraint still references, and that
+statement fails against the real database. For a planner
 whose entire contract is to fail closed before touching data, emitting SQL that
 can fail is a worse outcome than being slow.
 

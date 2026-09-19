@@ -4,7 +4,26 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
-## Unreleased
+## 0.3.0 - 2026-09-19
+
+### Added
+
+- Check constraints in the schema IR: validated, diffed, rendered into
+  `CREATE TABLE`, added and dropped in place on PostgreSQL, and carried across
+  a SQLite rebuild, which previously dropped them in silence. Decoding treats
+  the new `checks` field as optional so that schema files written against 0.2.0
+  still read.
+- `scripts/postgres_e2e.sh`, which applies generated SQL to a real PostgreSQL
+  server, and a PostgreSQL service container in CI. Half the renderer had never
+  been executed; the suite covers the example migration, a composite primary
+  key, check constraints, and cyclic foreign keys, the last being the only case
+  that exercises deferring a new table's foreign keys.
+- Four property-based tests over generated schemas: a schema never differs from
+  itself, table order never changes the plan, a destructive plan never renders
+  without approval, and rendering is deterministic.
+- A `version` command, checked against `moon.mod` by the smoke script.
+- `scripts/project_stats.sh`, which derives the figures the documents quote.
+- A Windows CI job, since the scripts had only run on Linux.
 
 ### Fixed
 
@@ -17,24 +36,24 @@ All notable changes to this project are recorded here. The format follows
 - Two tables could declare the same index name. Index names are database-wide
   in SQLite and schema-wide in PostgreSQL, so the second `CREATE INDEX` failed.
   Validation now rejects the collision and names the table that repeats it.
+- Validation issues were collected in table declaration order, so moving a
+  table within a file changed the report without changing its meaning. They are
+  now sorted by path and message.
+- Diagnostics shared stdout with the SQL, so a failing or blocked run piped its
+  message into the database in `plan ... | sqlite3`. Every diagnostic line is
+  now a SQL comment, which a database ignores while the non-zero exit still
+  stops the build.
+- The delimiter check rejected `'a--b'` and `'x;y'`, which are ordinary string
+  values. It now tracks quoting and judges only what falls outside a literal,
+  while rejecting an unterminated literal, which it previously allowed.
 
 ### Changed
 
-- A SQLite rebuild step now states in its reason that check constraints,
-  triggers and views the schema does not model are not carried over. SQLite's
-  generalised procedure recreates indexes, triggers and views; this planner
-  models only indexes, and the plan now says so instead of implying
-  completeness it does not have.
-
-### Documentation
-
-- `docs/design-decisions.md` and its Chinese translation now explain why a
-  SQLite column drop cannot use the native `DROP COLUMN` added in 3.35: four of
-  SQLite's eight refusal conditions involve check constraints, generated
-  columns, partial-index predicates, triggers and views, none of which the IR
-  models, so a gate built on the other four would emit SQL that can fail.
-- The README and the architecture note state what the IR does not model, since
-  that boundary is what decides both behaviours above.
+- A SQLite rebuild step states in its reason that triggers and views, which the
+  schema does not model, are not carried over.
+- CLI argument parsing is a pure function returning `Result`, so it is unit
+  tested rather than only exercised through the smoke script. Errors point at
+  `help` instead of reprinting the whole usage text.
 
 ## 0.2.0 - 2026-09-19
 

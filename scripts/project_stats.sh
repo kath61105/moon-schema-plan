@@ -28,8 +28,14 @@ moon test --enable-coverage 2>&1 | tail -1 | sed 's/^/  /'
 summary="$(moon coverage report -f summary 2>&1)"
 total="$(printf '%s' "$summary" | grep '^Total:' | awk '{print $2}')"
 cli="$(printf '%s' "$summary" | grep 'main.mbt:' | awk '{print $2}')"
-covered="${total%%/*}"
-overall="${total##*/}"
+
+# Both figures are "covered/total", so the library is the difference of each
+# part -- subtracting only the denominators would overstate the ratio.
+overall_covered="${total%%/*}"
+overall_lines="${total##*/}"
+cli_covered="${cli%%/*}"
 cli_lines="${cli##*/}"
-printf '  library:   %s/%s lines\n' "$covered" "$((overall - cli_lines))"
-printf '  cli:       %s (covered by scripts/cli_smoke.sh instead)\n' "$cli"
+
+printf '  library:   %s/%s lines\n' \
+  "$((overall_covered - cli_covered))" "$((overall_lines - cli_lines))"
+printf '  cli:       %s lines, plus scripts/cli_smoke.sh for behaviour\n' "$cli"

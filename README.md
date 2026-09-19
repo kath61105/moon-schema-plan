@@ -147,7 +147,8 @@ The schema IR covers tables, columns, indexes and foreign keys. Planning covers
 creating, dropping and renaming tables and columns, altering columns, index and
 foreign-key changes, and SQLite table rebuilds, for PostgreSQL and SQLite.
 
-The IR does not model check constraints, generated columns, triggers or views.
+The IR models tables, columns, indexes, foreign keys and check constraints. It
+does not model generated columns, partial-index predicates, triggers or views.
 Two consequences show up in the output: a SQLite column drop always becomes a
 rebuild rather than a native `DROP COLUMN`, because half of SQLite's conditions
 for refusing that statement involve objects the IR cannot see; and a rebuild
@@ -199,7 +200,7 @@ classification, the SQLite and PostgreSQL renderers, a demo CLI, and 23 tests,
 totalling 1,970 lines of MoonBit. Nothing was ever published from that state:
 there was no repository, no CI, no release and no registry entry.
 
-Every commit after it — 18 so far, changing 29 files by +3,349/-272 lines — was
+Every commit after it — 23 so far, changing 40 files by +4,688/-286 lines — was
 written during this period. That work is:
 
 - the risk-policy layer (`Risk::severity`/`parse`, `Plan::summary`,
@@ -208,8 +209,13 @@ written during this period. That work is:
   `report.mbt`;
 - the CLI rewrite: file inputs, the `verify` command, `--max-risk`, `--format`,
   `--out`, and distinct exit codes for a policy violation and a real error;
-- the test suite going from 23 to 85 tests and library coverage to 626/632
-  lines, in five new files, plus removal of one branch that proved to be dead;
+- CHECK constraints in the schema IR, which a SQLite rebuild used to drop in
+  silence;
+- the test suite going from 23 to 118 tests, library coverage to 715/719 lines
+  and the CLI from none to 67/196, including four property-based checks of the
+  determinism, gate and identity claims;
+- real database execution for both dialects, which is how every renderer defect
+  so far was found;
   two of those tests are regressions for defects found by executing generated
   SQL against a real database rather than by reading it;
 - `scripts/cli_smoke.sh`, asserting all 21 documented CLI invocations, and a
