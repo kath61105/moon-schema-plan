@@ -4,6 +4,25 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- A SQLite rebuild step now states in its reason that triggers and views on the
+  table are not recreated. SQLite's generalised procedure recreates indexes,
+  triggers and views; this planner models only indexes, and the plan now says
+  so instead of implying completeness it does not have.
+
+### Documentation
+
+- `docs/design-decisions.md` and its Chinese translation now explain why a
+  SQLite column drop cannot use the native `DROP COLUMN` added in 3.35: four of
+  SQLite's eight refusal conditions involve check constraints, generated
+  columns, partial-index predicates, triggers and views, none of which the IR
+  models, so a gate built on the other four would emit SQL that can fail.
+- The README and the architecture note state what the IR does not model, since
+  that boundary is what decides both behaviours above.
+
 ## 0.2.0 - 2026-09-19
 
 First public release. Version 0.1.0 was never published; it is kept below as

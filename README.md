@@ -147,6 +147,14 @@ The schema IR covers tables, columns, indexes and foreign keys. Planning covers
 creating, dropping and renaming tables and columns, altering columns, index and
 foreign-key changes, and SQLite table rebuilds, for PostgreSQL and SQLite.
 
+The IR does not model check constraints, generated columns, triggers or views.
+Two consequences show up in the output: a SQLite column drop always becomes a
+rebuild rather than a native `DROP COLUMN`, because half of SQLite's conditions
+for refusing that statement involve objects the IR cannot see; and a rebuild
+recreates indexes but not triggers or views, which each rebuild step states in
+its reason. [docs/design-decisions.md](docs/design-decisions.md) works through
+both.
+
 This release deliberately does **not** connect to a live database, parse
 arbitrary DDL, infer renames, migrate business data, or support MySQL.
 Introspection belongs in optional adapters; the planner stays a pure,

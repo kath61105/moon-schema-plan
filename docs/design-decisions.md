@@ -114,14 +114,65 @@ Several details of `sqlite_rebuild_sql` are deliberate:
   a type converts, and `Review` otherwise, because it rewrites the whole table
   either way.
 
-**A conservatism worth admitting.** SQLite has supported native `DROP COLUMN`
-since 3.35 (2021), subject to restrictions: the column must not be a primary
-key, indexed, unique, or referenced elsewhere. This planner rebuilds on *any*
-dropped column rather than testing whether those restrictions apply. The
-condition is easy to get subtly wrong, and getting it wrong means emitting SQL
-that fails in production. The cost is that dropping an ordinary column rewrites
-the table, which is slower on a large one. A future version could narrow this,
-at the price of one more condition that has to stay exactly right.
+### Why a column drop cannot use SQLite's native DROP COLUMN
+
+SQLite has supported `ALTER TABLE ... DROP COLUMN` since 3.35, so an obvious
+optimisation is to use it when the restrictions do not apply and to rebuild only
+otherwise. That optimisation cannot be implemented soundly here, and the reason
+is structural rather than a matter of effort.
+
+SQLite documents eight conditions under which `DROP COLUMN` fails. Split them by
+what this project's schema IR can actually see:
+
+| Condition | Visible in the IR? |
+| --- | --- |
+| The column is, or is part of, a `PRIMARY KEY` | Yes — `Column::primary_key` |
+| The column has a `UNIQUE` constraint | Yes — `Column::unique` |
+| The column is indexed | Yes — `Table::indexes` |
+| The column is used in a foreign key | Yes — `Table::foreign_keys` |
+| The column is named in a partial index's `WHERE` clause | **No** — index predicates are not modelled |
+| The column is named in a `CHECK` constraint | **No** — check constraints are not modelled |
+| The column is used in a generated column's expression | **No** — generated columns are not modelled |
+| The column appears in a trigger or a view | **No** — neither is modelled |
+
+Four of the eight are invisible. A gate built on the other four would emit
+`DROP COLUMN` for a column that a trigger or a `CHECK` constraint still
+references, and that statement fails against the real database. For a planner
+whose entire contract is to fail closed before touching data, emitting SQL that
+can fail is a worse outcome than being slow.
+
+This is the same trust boundary that governs the rest of the design: the planner
+is given two schema descriptions and never inspects a database, so it can only
+reason about what those descriptions contain. The rebuild is SQLite's own
+prescribed procedure for the general case and is unaffected by all eight
+conditions.
+
+`sqlite_rebuild_test.mbt` locks this in: the easiest possible case for a native
+drop — a column that is not a primary key, not unique, not indexed and not in
+any foreign key — still produces one `RebuildTable`, and the rendered SQL
+contains no `DROP COLUMN`. The same file asserts the contrast, that PostgreSQL
+does drop the identical column directly, so the rebuild reads as a dialect
+constraint rather than a house style.
+
+### What the rebuild does not carry over
+
+SQLite's generalised procedure recreates indexes, **triggers and views**. This
+planner recreates indexes only, because the IR models indexes and does not model
+triggers or views. `DROP TABLE` removes a table's triggers, and a view over the
+old table survives but is left referring to a shape that no longer exists.
+
+Rather than leave that to be discovered afterwards, every rebuild step says so
+in its `reason`, which travels into the SQL comment, the JSON report and the
+Markdown review document alike:
+
+```
+-- step-1 [review] SQLite requires an auditable table rebuild for this schema
+-- change; triggers and views on the table are not recreated
+```
+
+A table carrying triggers or views therefore needs an operator to reinstate them
+as part of the migration. That is a real limitation of the IR's scope, and the
+plan states it rather than implying completeness it does not have.
 
 **How it is verified.** `scripts/sqlite_e2e.sh` pipes the generated SQL into a
 real `sqlite3` database and asserts that rows survive, the backfill applied, the

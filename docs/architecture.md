@@ -84,6 +84,22 @@ rebuild — is in [design-decisions.md](design-decisions.md)
 ([中文](design-decisions.zh-CN.md)), together with the alternatives that were
 rejected and what each choice costs.
 
+## What the IR models, and what it does not
+
+The IR models tables, columns, indexes and foreign keys. It does **not** model
+check constraints, generated columns, partial-index predicates, triggers or
+views. That boundary is not incidental — it decides what the planner is allowed
+to conclude.
+
+Two consequences are worth naming, because both are visible in the output:
+
+- A SQLite column drop always becomes a rebuild. Half of SQLite's conditions for
+  refusing a native `DROP COLUMN` involve objects the IR cannot see, so no
+  inspection of the IR can prove the statement would succeed.
+- A rebuild recreates indexes but not triggers or views, which SQLite's own
+  procedure would also recreate. Every rebuild step says so in its `reason`, so
+  an operator reads it in the plan rather than discovering it afterwards.
+
 ## Trust boundary
 
 Column types and default expressions remain dialect SQL fragments because a
