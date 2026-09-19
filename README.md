@@ -212,7 +212,7 @@ classification, the SQLite and PostgreSQL renderers, a demo CLI, and 23 tests,
 totalling 1,970 lines of MoonBit. Nothing was ever published from that state:
 there was no repository, no CI, no release and no registry entry.
 
-Every commit after it — 23 so far, changing 40 files by +4,688/-286 lines — was
+Every commit after it — 26 so far, changing 41 files by +5,125/-291 lines — was
 written during this period. That work is:
 
 - the risk-policy layer (`Risk::severity`/`parse`, `Plan::summary`,
@@ -223,7 +223,7 @@ written during this period. That work is:
   `--out`, and distinct exit codes for a policy violation and a real error;
 - CHECK constraints in the schema IR, which a SQLite rebuild used to drop in
   silence;
-- the test suite going from 23 to 118 tests, library coverage to 715/719 lines
+- the test suite going from 23 to 125 tests, library coverage to 763/767 lines
   and the CLI from none to 67/196, including four property-based checks of the
   determinism, gate and identity claims;
 - real database execution for both dialects, which is how every renderer defect
