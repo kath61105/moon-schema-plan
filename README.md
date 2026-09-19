@@ -170,7 +170,12 @@ moon check --deny-warn
 moon test --deny-warn
 sh scripts/cli_smoke.sh     # every documented CLI invocation and exit code
 sh scripts/sqlite_e2e.sh    # applies generated SQL to a real sqlite3 database
+sh scripts/postgres_e2e.sh  # the same against a real PostgreSQL server
 ```
+
+`postgres_e2e.sh` reads the standard libpq environment variables (`PGHOST`,
+`PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`), so it runs against any server
+you point it at, including the one CI starts as a service container.
 
 CI runs all of the above and the test suite on the `wasm`, `wasm-gc`, `js` and
 `native` backends. The native backend compiles through C, so it needs a system C

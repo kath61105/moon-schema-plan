@@ -19,6 +19,12 @@ cd "$(dirname "$0")/.."
 : "${PGDATABASE:=postgres}"
 export PGHOST PGPORT PGUSER PGDATABASE
 
+# "schema does not exist" notices from the idempotent DROP would otherwise bury
+# the assertions. client_min_messages is a server setting, so it goes here.
+quiet_options="-c client_min_messages=warning"
+PGOPTIONS="$quiet_options"
+export PGOPTIONS
+
 failures=0
 
 # Every statement must succeed, and a NOTICE must not be mistaken for output.
@@ -47,7 +53,7 @@ check() {
 # Each case owns a schema, so one failure cannot cascade into the next.
 fresh_schema() {
   psql_run -c "DROP SCHEMA IF EXISTS $1 CASCADE; CREATE SCHEMA $1; " >/dev/null
-  PGOPTIONS="--search_path=$1"
+  PGOPTIONS="$quiet_options --search_path=$1"
   export PGOPTIONS
 }
 

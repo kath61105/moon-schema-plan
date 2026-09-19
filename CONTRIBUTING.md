@@ -17,11 +17,15 @@ moon check --deny-warn
 moon test --deny-warn
 sh scripts/cli_smoke.sh
 sh scripts/sqlite_e2e.sh
+sh scripts/postgres_e2e.sh
 ```
 
 `scripts/cli_smoke.sh` asserts every command and exit code the README
 documents, so a change to the CLI must update the README and that script
-together. `scripts/sqlite_e2e.sh` needs the `sqlite3` binary on `PATH`.
+together. `scripts/sqlite_e2e.sh` needs the `sqlite3` binary on `PATH`, and
+`scripts/postgres_e2e.sh` needs `psql` and a server described by the usual
+libpq environment variables. Both execute generated SQL rather than comparing
+it to expected strings, which is how every renderer defect so far was found.
 
 `scripts/project_stats.sh` recomputes the commit, diff, test and coverage
 figures that `README.md` and `docs/proposal.zh-CN.md` quote. Run it if you

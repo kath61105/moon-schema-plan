@@ -24,6 +24,10 @@ locally.
   database, asserting that rows survive, the dropped column is gone, indexes
   are recreated, no staging table is left behind, and an unapproved destructive
   plan emits no SQL at all
+- `sh scripts/postgres_e2e.sh` — the same against a real PostgreSQL server,
+  covering the example migration, a composite primary key, cyclic foreign keys
+  (the only path that exercises deferred constraint creation) and check
+  constraints added and dropped in place
 
 Coverage is checked with `moon coverage clean && moon test --enable-coverage &&
 moon coverage report -f summary`. The library stands at 626 of 632 lines; the
