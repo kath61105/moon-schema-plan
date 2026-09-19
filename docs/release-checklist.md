@@ -36,12 +36,15 @@ than unit tests, because its contract is its exit status, not its internals.
 These steps need the entrant's real identities and are deliberately not
 fabricated by the codebase.
 
-- replace the `local` MoonBit module owner in `moon.mod` with the mooncakes
-  account name, and the `OWNER` placeholder in `moon.mod` and `README.md` with
-  the GitHub account name
+- ~~replace the placeholder module owner and repository URL~~ — done: the
+  module is `jamesrobin2026/moon_schema_plan` and the repository is
+  `https://github.com/jamesrobin2026/moon-schema-plan`
 - create the public GitHub repository and push `main`
 - confirm GitHub Actions is enabled and the CI badge is green
-- publish the package to Mooncakes and check its rendered documentation
+- register the `jamesrobin2026` account on <https://mooncakes.io> (it signs in
+  with GitHub), then `moon publish` and check the rendered documentation. A
+  MoonBit module name is `<owner>/<module>`, and the owner must match a
+  registered account, so this has to happen before the first publish
 - tag a release and attach the demonstration material
 - register on the event's Feishu form with the repository URL, and join the
   official participant group — the rules state that entrants who are not in the

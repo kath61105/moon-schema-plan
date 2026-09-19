@@ -1,6 +1,6 @@
 # moon_schema_plan
 
-[![CI](https://github.com/OWNER/moon-schema-plan/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/moon-schema-plan/actions/workflows/ci.yml)
+[![CI](https://github.com/jamesrobin2026/moon-schema-plan/actions/workflows/ci.yml/badge.svg)](https://github.com/jamesrobin2026/moon-schema-plan/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 Deterministic database schema diffing, migration planning and destructive-change
@@ -37,7 +37,7 @@ The rules are deliberately conservative:
 ## Installation
 
 ```sh
-moon add <owner>/moon_schema_plan
+moon add jamesrobin2026/moon_schema_plan
 ```
 
 The library itself has no third-party runtime dependencies. The bundled CLI
