@@ -15,8 +15,13 @@ moon fmt --check
 moon info
 moon check --deny-warn
 moon test --deny-warn
-scripts/sqlite_e2e.sh
+sh scripts/cli_smoke.sh
+sh scripts/sqlite_e2e.sh
 ```
+
+`scripts/cli_smoke.sh` asserts every command and exit code the README
+documents, so a change to the CLI must update the README and that script
+together. `scripts/sqlite_e2e.sh` needs the `sqlite3` binary on `PATH`.
 
 Commit messages should describe one meaningful engineering change. Do not split
 work into empty or mechanical commits merely to increase the count.
