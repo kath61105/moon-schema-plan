@@ -5,9 +5,16 @@ fn quote_identifier(name : String) -> String {
 }
 
 ///|
-fn column_definition(column : Column) -> String {
+/// `inline_primary_key` is false when the table declares a composite primary
+/// key, which has to be one table-level constraint. A single-column key keeps
+/// the inline form, because in SQLite `INTEGER PRIMARY KEY` written inline is
+/// a rowid alias and `PRIMARY KEY("id")` written separately is not.
+fn column_definition(
+  column : Column,
+  inline_primary_key? : Bool = true,
+) -> String {
   let parts : Array[String] = [quote_identifier(column.name), column.data_type]
-  if column.primary_key {
+  if column.primary_key && inline_primary_key {
     parts.push("PRIMARY KEY")
   }
   if column.unique {
@@ -43,7 +50,15 @@ fn foreign_key_definition(foreign_key : ForeignKey) -> String {
 
 ///|
 fn create_table_sql(table : Table, override_name? : String? = None) -> String {
-  let definitions = table.columns.map(column_definition)
+  let key_columns = table.columns.filter(column => column.primary_key)
+  let composite_key = key_columns.length() > 1
+  let definitions = table.columns.map(column => {
+    column_definition(column, inline_primary_key=!composite_key)
+  })
+  if composite_key {
+    let names = key_columns.map(column => quote_identifier(column.name))
+    definitions.push("PRIMARY KEY (\{names.join(", ")})")
+  }
   definitions.push_iter(table.foreign_keys.map(foreign_key_definition).iter())
   let name = override_name.unwrap_or(table.name)
   let body = definitions.join(",\n  ")

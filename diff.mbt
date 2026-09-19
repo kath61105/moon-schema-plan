@@ -224,12 +224,12 @@ fn risk_for(change : Change) -> (Risk, String) {
         }) {
         (
           Destructive,
-          "SQLite table rebuild drops a column or converts stored values; triggers and views on the table are not recreated",
+          "SQLite table rebuild drops a column or converts stored values; check constraints, triggers and views the schema does not model are not carried over",
         )
       } else {
         (
           Review,
-          "SQLite requires an auditable table rebuild for this schema change; triggers and views on the table are not recreated",
+          "SQLite requires an auditable table rebuild for this schema change; check constraints, triggers and views the schema does not model are not carried over",
         )
       }
   }

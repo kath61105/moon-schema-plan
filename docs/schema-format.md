@@ -58,7 +58,9 @@ which two snapshots it compares, and it is never parsed.
 | `data_type` | A dialect SQL fragment, emitted verbatim. Must be non-empty and free of `;`, `--` and `/*`. |
 | `default_value` | Optional SQL expression, emitted verbatim. **A string literal needs its own quotes**: `"'anonymous'"`, not `"anonymous"`. Same delimiter rules as `data_type`. |
 | `nullable` | `false` renders `NOT NULL`. A `primary_key` column must not be nullable. |
+| `primary_key` | Marking one column renders an inline `PRIMARY KEY`. Marking several renders one table-level `PRIMARY KEY (a, b)` constraint, which is how a composite key must be written. |
 | `unique` | A column-level `UNIQUE`. For a multi-column constraint use a unique index instead. |
+| `indexes[].name` | Must be unique across the **whole schema**, not only within its table: index names are database-wide in SQLite and schema-wide in PostgreSQL. |
 | `indexes[].columns` | Must name columns of the same table, and must not be empty. |
 | `foreign_keys[].columns` / `referenced_columns` | Must be non-empty and the same length. Local columns must exist in this table; referenced ones in the referenced table. |
 | `on_delete` / `on_update` | Optional. One of `NO ACTION`, `RESTRICT`, `CASCADE`, `SET NULL`, `SET DEFAULT`. |

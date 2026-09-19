@@ -110,6 +110,46 @@ if grep -q 'CREATE TABLE' "$work_dir/blocked.sql"; then
   failures=$((failures + 1))
 fi
 
+# Case 4: a composite primary key. Rendering this as one inline PRIMARY KEY per
+# key column produces SQL that SQLite rejects outright, and reading the output
+# did not catch it, so the statement is executed here.
+composite_db="$work_dir/composite.db"
+composite_schema='{"version":"2","tables":[{"name":"membership","columns":[
+  {"name":"user_id","data_type":"INTEGER","nullable":false,"primary_key":true,"unique":false},
+  {"name":"team_id","data_type":"INTEGER","nullable":false,"primary_key":true,"unique":false},
+  {"name":"role","data_type":"TEXT","nullable":true,"primary_key":false,"unique":false}
+],"indexes":[],"foreign_keys":[]}]}'
+
+moon run cmd/main -- plan sqlite \
+  --before-json '{"version":"1","tables":[]}' \
+  --after-json "$composite_schema" > "$work_dir/composite.sql"
+
+sqlite3 "$composite_db" < "$work_dir/composite.sql" 2>"$work_dir/composite.err" || true
+
+if [ -s "$work_dir/composite.err" ]; then
+  printf 'FAIL composite primary key was rejected: %s\n' \
+    "$(cat "$work_dir/composite.err")" >&2
+  failures=$((failures + 1))
+else
+  printf 'ok   composite primary key applies cleanly\n'
+fi
+
+composite_key="$(sqlite3 "$composite_db" \
+  "SELECT group_concat(name, ',') FROM pragma_table_info('membership') WHERE pk > 0;" \
+  | normalise)"
+
+check 'composite primary key covers both columns' 'user_id,team_id' "$composite_key"
+
+# The key must actually be enforced, not merely accepted.
+sqlite3 "$composite_db" \
+  "INSERT INTO membership(user_id, team_id, role) VALUES (1, 1, 'owner');" >/dev/null
+duplicate_rejected=0
+sqlite3 "$composite_db" \
+  "INSERT INTO membership(user_id, team_id, role) VALUES (1, 1, 'member');" \
+  >/dev/null 2>&1 || duplicate_rejected=1
+
+check 'composite primary key rejects a duplicate pair' '1' "$duplicate_rejected"
+
 if [ "$failures" != "0" ]; then
   printf '\n%s SQLite end-to-end assertions failed\n' "$failures" >&2
   exit 1

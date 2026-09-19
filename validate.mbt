@@ -41,6 +41,27 @@ fn valid_reference_action(action : String) -> Bool {
 }
 
 ///|
+/// Index names are database-wide in SQLite and schema-wide in PostgreSQL, so
+/// two tables cannot share one. The per-table duplicate check cannot see this,
+/// and the renderer would emit a `CREATE INDEX` that fails on the second table.
+fn duplicate_index_names(schema : Schema) -> Array[ValidationIssue] {
+  let issues : Array[ValidationIssue] = []
+  let seen : Array[String] = []
+  for table in schema.tables {
+    for index in table.indexes {
+      if index.name != "" && has_name(seen, index.name) {
+        issues.push({
+          path: "tables.\{table.name}.indexes.\{index.name}",
+          message: "index name is already used by another table; index names are database-wide",
+        })
+      }
+      seen.push(index.name)
+    }
+  }
+  issues
+}
+
+///|
 /// Validate structural invariants before planning. The function returns every
 /// issue it can find so callers can fix a schema in one pass.
 pub fn validate_schema(schema : Schema) -> Array[ValidationIssue] {
@@ -50,6 +71,7 @@ pub fn validate_schema(schema : Schema) -> Array[ValidationIssue] {
   }
   let table_names = schema.tables.map(table => table.name)
   issues.push_iter(duplicate_names(table_names, "tables").iter())
+  issues.push_iter(duplicate_index_names(schema).iter())
   for table in schema.tables {
     let base = "tables.\{table.name}"
     if table.name.has_prefix("__msp_new_") {

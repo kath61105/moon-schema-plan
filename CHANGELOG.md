@@ -6,12 +6,25 @@ All notable changes to this project are recorded here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- A composite primary key rendered one inline `PRIMARY KEY` per key column,
+  which both SQLite and PostgreSQL reject as more than one primary key per
+  table. It now renders a single table-level `PRIMARY KEY (a, b)` constraint.
+  A single-column key keeps the inline form, because in SQLite an inline
+  `INTEGER PRIMARY KEY` is a rowid alias and a separate clause is not. The
+  plan had classified the broken output as `safe`.
+- Two tables could declare the same index name. Index names are database-wide
+  in SQLite and schema-wide in PostgreSQL, so the second `CREATE INDEX` failed.
+  Validation now rejects the collision and names the table that repeats it.
+
 ### Changed
 
-- A SQLite rebuild step now states in its reason that triggers and views on the
-  table are not recreated. SQLite's generalised procedure recreates indexes,
-  triggers and views; this planner models only indexes, and the plan now says
-  so instead of implying completeness it does not have.
+- A SQLite rebuild step now states in its reason that check constraints,
+  triggers and views the schema does not model are not carried over. SQLite's
+  generalised procedure recreates indexes, triggers and views; this planner
+  models only indexes, and the plan now says so instead of implying
+  completeness it does not have.
 
 ### Documentation
 
