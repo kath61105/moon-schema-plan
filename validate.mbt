@@ -15,6 +15,23 @@ fn duplicate_names(
       }
     }
   }
+  sort_issues(issues)
+}
+
+///|
+/// Issues are collected in whatever order the schema happens to list its
+/// tables, which would make a validation report change when a table moves
+/// within a file. Sorting them makes the report canonical, the same way the
+/// planner canonicalises its steps.
+fn sort_issues(issues : Array[ValidationIssue]) -> Array[ValidationIssue] {
+  issues.sort_by((left, right) => {
+    let by_path = left.path.lexical_compare(right.path)
+    if by_path != 0 {
+      by_path
+    } else {
+      left.message.lexical_compare(right.message)
+    }
+  })
   issues
 }
 
@@ -203,5 +220,5 @@ pub fn validate_schema(schema : Schema) -> Array[ValidationIssue] {
       }
     }
   }
-  issues
+  sort_issues(issues)
 }

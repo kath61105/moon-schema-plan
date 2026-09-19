@@ -567,7 +567,7 @@ pub fn build_plan(
   issues.push_iter(
     validate_dialect_transition(before, after, hints, dialect).iter(),
   )
-  guard issues.is_empty() else { return Err(issues) }
+  guard issues.is_empty() else { return Err(sort_issues(issues)) }
   let changes = collect_changes(before, after, hints, dialect)
   let steps = changes.mapi((index, change) => {
     let (risk, reason) = risk_for(change)

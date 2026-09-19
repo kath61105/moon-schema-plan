@@ -64,8 +64,22 @@ jobs:
         run: moon test --target ${{ matrix.target }} --deny-warn
 
   end-to-end:
-    name: CLI and real SQLite migration
+    name: CLI and real database migrations
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v4
 
@@ -79,16 +93,25 @@ jobs:
       - name: Update the package registry index
         run: moon update
 
-      - name: Install sqlite3
+      - name: Install database clients
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y sqlite3
+          sudo apt-get install --no-install-recommends -y sqlite3 postgresql-client
 
       - name: Exercise every documented CLI invocation
         run: sh scripts/cli_smoke.sh
 
-      - name: Apply generated migrations to a real database
+      - name: Apply generated migrations to a real SQLite database
         run: sh scripts/sqlite_e2e.sh
+
+      - name: Apply generated migrations to a real PostgreSQL server
+        run: sh scripts/postgres_e2e.sh
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
 
       - name: Publish the example migration report
         run: |
